@@ -1,7 +1,7 @@
 var b2GearJoint_GetRatio = Module.cwrap("b2GearJoint_GetRatio", 'number',
   ['number']);
 
-function b2GearJoint(def) {
+export function b2GearJoint(def) {
   this.ptr = null;
   this.next = null;
 }
@@ -19,7 +19,7 @@ var b2GearJointDef_Create = Module.cwrap("b2GearJointDef_Create",
     'number', 'number', 'number']);
 
 /**@constructor*/
-function b2GearJointDef() {
+export function b2GearJointDef() {
   this.bodyA = null;
   this.bodyB = null;
   this.collideConnected = false;

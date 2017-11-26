@@ -1,5 +1,5 @@
 /**@constructor*/
-function b2RopeJoint(def) {
+export function b2RopeJoint(def) {
   this.next = null;
   this.ptr = null;
 }
@@ -14,7 +14,7 @@ var b2RopeJointDef_Create = Module.cwrap("b2RopeJointDef_Create",
     'number', 'number']);
 
 /**@constructor*/
-function b2RopeJointDef() {
+export function b2RopeJointDef() {
   // joint def
   this.bodyA = null;
   this.bodyB = null;

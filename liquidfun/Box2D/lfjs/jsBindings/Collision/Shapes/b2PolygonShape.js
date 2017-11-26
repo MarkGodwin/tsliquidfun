@@ -113,7 +113,7 @@ var b2PolygonShape_DestroyParticlesInShape_4 =
      'number']);
 
 /** @constructor */
-function b2PolygonShape() {
+export function b2PolygonShape() {
   this.position = new b2Vec2();
   this.vertices = [];
   this.type = b2Shape_Type_e_polygon;

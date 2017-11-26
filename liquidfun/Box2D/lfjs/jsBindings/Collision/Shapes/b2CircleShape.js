@@ -32,7 +32,7 @@ var b2CircleShape_DestroyParticlesInShape =
      'number', 'number', 'number', 'number']);
 
 /**@constructor*/
-function b2CircleShape() {
+export function b2CircleShape() {
   this.position = new b2Vec2();
   this.radius = 0;
   this.type = b2Shape_Type_e_circle;

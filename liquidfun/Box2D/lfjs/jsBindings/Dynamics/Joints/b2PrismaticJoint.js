@@ -16,7 +16,7 @@ var b2PrismaticJoint_SetMotorSpeed =
   Module.cwrap('b2PrismaticJoint_SetMotorSpeed', 'number', ['number', 'number']);
 
 /**@constructor*/
-function b2PrismaticJoint(def) {
+export function b2PrismaticJoint(def) {
   this.ptr = null;
   this.next = null;
 }
@@ -85,7 +85,7 @@ var b2PrismaticJointDef_InitializeAndCreate = Module.cwrap("b2PrismaticJointDef_
     'number', 'number', 'number']);
 
 /**@constructor*/
-function b2PrismaticJointDef() {
+export function b2PrismaticJointDef() {
   // joint def
   this.bodyA = null;
   this.bodyB = null;

@@ -6,7 +6,7 @@ var b2MotorJoint_SetLinearOffset =
     ['number', 'number', 'number']);
 
 /**@constructor*/
-function b2MotorJoint(def) {
+export function b2MotorJoint(def) {
   this.bodyA = def.bodyA;
   this.bodyB = def.bodyB;
   this.ptr = null;
@@ -40,7 +40,7 @@ var b2MotorJointDef_InitializeAndCreate = Module.cwrap("b2MotorJointDef_Initiali
     'number', 'number', 'number']);
 
 /**@constructor*/
-function b2MotorJointDef() {
+export function b2MotorJointDef() {
   // joint def
   this.bodyA = null;
   this.bodyB = null;

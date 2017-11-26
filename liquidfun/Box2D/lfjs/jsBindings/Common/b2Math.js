@@ -1,20 +1,20 @@
 var FLT_EPSILON = 1.19209290E-07;
 
-function b2Max(a ,b) {
+export function b2Max(a ,b) {
   return new b2Vec2(Math.max(a.x, b.x), Math.max(a.y, b.y));
 }
 
-function b2Min(a, b) {
+export function b2Min(a, b) {
   return new b2Vec2(Math.min(a.x, b.x), Math.min(a.y, b.y));
 }
 
-function b2Clamp(a, low, high) {
+export function b2Clamp(a, low, high) {
   return b2Max(low, b2Min(a, high));
 }
 
 
 /** @constructor */
-function b2Vec2(x, y) {
+export function b2Vec2(x, y) {
   if (x === undefined) {
     x = 0;
   }
@@ -96,7 +96,7 @@ b2Vec2.prototype.LengthSquared = function() {
 };
 
 /** @constructor */
-function b2Rot(radians) {
+export function b2Rot(radians) {
   if (radians === undefined) {
     radians = 0;
   }
@@ -119,7 +119,7 @@ b2Rot.prototype.GetXAxis = function() {
 };
 
 /** @constructor */
-function b2Transform(position, rotation) {
+export function b2Transform(position, rotation) {
   if (position === undefined) {
     position = new b2Vec2();
   }

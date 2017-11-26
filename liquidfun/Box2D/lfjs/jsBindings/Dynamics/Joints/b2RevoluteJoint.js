@@ -23,7 +23,7 @@ var b2RevoluteJoint_SetMotorSpeed =
     ['number', 'number']);
 
 /** @constructor */
-function b2RevoluteJoint(revoluteJointDef) {
+export function b2RevoluteJoint(revoluteJointDef) {
   this.collideConnected = revoluteJointDef.collideConnected;
   this.enableLimit = revoluteJointDef.enableLimit;
   this.enableMotor = revoluteJointDef.enableMotor;
@@ -87,7 +87,7 @@ var b2RevoluteJointDef_InitializeAndCreate =
      'number']);
 
 /** @constructor */
-function b2RevoluteJointDef() {
+export function b2RevoluteJointDef() {
   this.collideConnected = false;
   this.enableLimit = false;
   this.enableMotor = false;

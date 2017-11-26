@@ -1,5 +1,8 @@
 // global call back functions
-b2World.BeginContactBody = function(contactPtr) {
+var world = null;
+
+b2World.BeginContactBody = function (contactPtr)
+{
   if (world.listener.BeginContactBody === undefined) {
     return;
   }
@@ -86,7 +89,9 @@ var _vec2Buf = null;
 
 // Todo move the buffers to native access
 /** @constructor */
-function b2World(gravity) {
+export function b2World(gravity)
+{
+  world = this;
   this.bodies = [];
   this.bodiesLookup = {};
   this.fixturesLookup = {};
@@ -133,6 +138,7 @@ b2World.prototype.CreateBody = function(bodyDef) {
     bodyDef.linearVelocity.y, bodyDef.position.x, bodyDef.position.y,
     bodyDef.type, bodyDef.userData));
   b2World._Push(body, this.bodies);
+  body.world = this;
   this.bodiesLookup[body.ptr] = body;
   return body;
 };

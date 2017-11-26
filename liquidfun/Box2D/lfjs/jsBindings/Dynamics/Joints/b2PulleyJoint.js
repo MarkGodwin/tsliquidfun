@@ -1,5 +1,5 @@
 /**@constructor*/
-function b2PulleyJoint(def) {
+export function b2PulleyJoint(def) {
   this.ptr = null;
   this.next = null;
 }
@@ -28,7 +28,7 @@ var b2PulleyJointDef_InitializeAndCreate = Module.cwrap("b2PulleyJointDef_Initia
     'number', 'number', 'number']);
 
 /**@constructor*/
-function b2PulleyJointDef() {
+export function b2PulleyJointDef() {
   // joint def
   this.bodyA = null;
   this.bodyB = null;

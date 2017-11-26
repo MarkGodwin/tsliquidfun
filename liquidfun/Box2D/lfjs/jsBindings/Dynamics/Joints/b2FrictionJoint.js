@@ -16,7 +16,7 @@ var b2FrictionJointDef_InitializeAndCreate = Module.cwrap("b2FrictionJointDef_In
     // friction joint def
     'number', 'number', 'number']);
 
-function b2FrictionJointDef() {
+export function b2FrictionJointDef() {
   // joint def
   this.bodyA = null;
   this.bodyB = null;
@@ -59,7 +59,7 @@ b2FrictionJointDef.prototype.InitializeAndCreate  = function(bodyA, bodyB, ancho
   return frictionJoint;
 };
 
-function b2FrictionJoint(def) {
+export function b2FrictionJoint(def) {
   this.bodyA = def.bodyA;
   this.bodyB = def.bodyB;
   this.ptr = null;

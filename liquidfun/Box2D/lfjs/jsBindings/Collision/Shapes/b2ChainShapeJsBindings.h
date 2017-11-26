@@ -10,6 +10,6 @@ void* b2ChainShape_CreateFixture(
     // filter
     double categoryBits, double groupIndex, double maskBits,
     // chain
-    float* vertices, double length);
+    float* vertices, double length, double hasGhostVertices, double isLoop);
 }
 #endif

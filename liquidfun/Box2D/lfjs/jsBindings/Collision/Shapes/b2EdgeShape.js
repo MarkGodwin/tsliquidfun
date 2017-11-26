@@ -12,7 +12,7 @@ var b2EdgeShape_CreateFixture =
       'number', 'number']);
 
 /** @constructor */
-function b2EdgeShape() {
+export function b2EdgeShape() {
   this.hasVertex0 = false;
   this.hasVertex3 = false;
   this.vertex0 = new b2Vec2();

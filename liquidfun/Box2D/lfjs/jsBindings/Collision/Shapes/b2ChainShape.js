@@ -5,17 +5,19 @@ var b2ChainShape_CreateFixture =
       'number', 'number', 'number',
       'number', 'number',
       // Chain vertices and count
-      'number', 'number']);
+      'number', 'number', 'number']);
 
 /**@constructor*/
-function b2ChainShape() {
+export function b2ChainShape() {
   this.radius = b2_polygonRadius;
   this.vertices = [];
+  this.hasGhostVertices = false;
+  this.isLoop = false;
   this.type = b2Shape_Type_e_chain;
 }
 
 b2ChainShape.prototype.CreateLoop = function() {
-   this.vertices.push(this.vertices[0]);
+   this.isLoop = true;
 };
 
 // TODO Optimize this
@@ -46,7 +48,7 @@ b2ChainShape.prototype._CreateFixture = function(body, fixtureDef) {
     // filter def
     fixtureDef.filter.categoryBits, fixtureDef.filter.groupIndex, fixtureDef.filter.maskBits,
     // vertices and length
-    dataHeap.byteOffset, data.length);
+    dataHeap.byteOffset, data.length, this.hasGhostVertices, this.isLoop);
 
   // Free memory
   Module._free(dataHeap.byteOffset);

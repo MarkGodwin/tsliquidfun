@@ -1,5 +1,5 @@
 /**@constructor*/
-function b2ParticleSystemDef() {
+export function b2ParticleSystemDef() {
   // Initialize physical coefficients to the maximum values that
   // maintain numerical stability.
   this.colorMixingStrength = 0.5;
@@ -65,7 +65,7 @@ var b2ParticleSystem_SetRadius =
   Module.cwrap('b2ParticleSystem_SetRadius', 'null', ['number', 'number']);
 
 /** @constructor */
-function b2ParticleSystem(ptr) {
+export function b2ParticleSystem(ptr) {
   this.dampingStrength = 1.0;
   // is this a sane default for density?
   this.density = 1.0;
@@ -80,7 +80,7 @@ b2ParticleSystem.prototype.CreateParticle = function(pd) {
     pd.color.r, pd.color.g, pd.color.b,
     pd.color.a, pd.flags, pd.group,
     pd.lifetime, pd.position.x, pd.position.y,
-    pd.userData, pd.velocity.x, pd.velocity.y);
+    pd.velocity.x, pd.velocity.y, pd.userData);
 };
 
 b2ParticleSystem.prototype.CreateParticleGroup = function(pgd) {

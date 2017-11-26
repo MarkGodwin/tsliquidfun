@@ -19,7 +19,7 @@ var b2WeldJointDef_InitializeAndCreate = Module.cwrap("b2WeldJointDef_Initialize
     'number', 'number']);
 
 /** @constructor */
-function b2WeldJointDef() {
+export function b2WeldJointDef() {
   // joint def
   this.bodyA = null;
   this.bodyB = null;
@@ -64,7 +64,7 @@ b2WeldJointDef.prototype.InitializeAndCreate  = function(bodyA, bodyB, anchor) {
 };
 
 /** @constructor */
-function b2WeldJoint(def) {
+export function b2WeldJoint(def) {
   this.bodyA = def.bodyA;
   this.bodyB = def.bodyB;
   this.next = null;
