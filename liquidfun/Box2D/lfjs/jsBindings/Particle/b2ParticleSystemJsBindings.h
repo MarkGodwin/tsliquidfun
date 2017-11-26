@@ -3,9 +3,9 @@
 extern "C" {
 double b2ParticleSystem_CreateParticle(void* particleSystem,
     //particleDef
-    double colorR, double colorB, double colorG, double colorA,
-    double flags, double group, double lifetime, double positionX,
-    double positionY, double userData, double velocityX, double velocityY);
+    double colorR, double colorG, double colorB, double colorA,
+    double flags, void *group, double lifetime, double positionX,
+    double positionY, double velocityX, double velocityY, void *userData);
 
     void* b2ParticleSystem_GetColorBuffer(void* particleSystem);
     double b2ParticleSystem_GetParticleCount(void* particleSystem);

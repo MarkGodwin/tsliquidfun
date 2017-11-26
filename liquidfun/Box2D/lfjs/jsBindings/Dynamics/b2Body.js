@@ -80,10 +80,11 @@ var b2Body_GetGravityScale = Module.cwrap('b2Body_GetGravityScale', 'number', ['
 var b2Body_xf_offset = Offsets.b2Body.xf;
 var b2Body_userData_offset = Offsets.b2Body.userData;
 /**@constructor*/
-function b2Body(ptr) {
+export function b2Body(ptr) {
   this.buffer = new DataView(Module.HEAPU8.buffer, ptr);
   this.ptr = ptr;
   this.fixtures = [];
+  this.world = null;
 }
 
 b2Body.prototype.ApplyAngularImpulse = function(impulse, wake) {
@@ -112,10 +113,14 @@ b2Body.prototype.CreateFixtureFromDef = function(fixtureDef) {
   fixture._SetPtr(fixtureDef.shape._CreateFixture(this, fixtureDef));
   fixture.body = this;
   b2World._Push(fixture, this.fixtures);
-  world.fixturesLookup[fixture.ptr] = fixture;
+  this.world.fixturesLookup[fixture.ptr] = fixture;
   fixture.SetFilterData(fixtureDef.filter);
   return fixture;
 };
+
+b2Body.prototype.GetWorld = function () {
+    return this.world;
+}
 
 b2Body.prototype.CreateFixtureFromShape = function(shape, density) {
   var fixtureDef = new b2FixtureDef();
@@ -244,12 +249,12 @@ b2Body.prototype.GetGravityScale = function() {
 
 
 // General body globals
-var b2_staticBody = 0;
-var b2_kinematicBody = 1;
-var b2_dynamicBody = 2;
+export var b2_staticBody = 0;
+export var b2_kinematicBody = 1;
+export var b2_dynamicBody = 2;
 
 /** @constructor */
-function b2BodyDef() {
+export function b2BodyDef() {
   this.active = true;
   this.allowSleep = true;
   this.angle = 0;

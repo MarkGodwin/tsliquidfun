@@ -13,7 +13,7 @@ var b2Fixture_filter_maskBits_offset = Offsets.b2Fixture.filterMaskBits;
 var b2Fixture_filter_groupIndex_offset = Offsets.b2Fixture.filterGroupIndex;
 /**@constructor*/
 
-function b2Fixture() {
+export function b2Fixture() {
   this.body = null;
   this.buffer = null;
   this.ptr = null;
@@ -64,7 +64,7 @@ b2Fixture.prototype.TestPoint = function(p) {
 };
 
 /**@constructor*/
-function b2FixtureDef() {
+export function b2FixtureDef() {
   this.density = 0.0;
   this.friction = 0.2;
   this.isSensor = false;

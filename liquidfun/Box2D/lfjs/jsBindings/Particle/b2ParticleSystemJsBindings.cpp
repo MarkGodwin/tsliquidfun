@@ -3,16 +3,16 @@
 
 double b2ParticleSystem_CreateParticle(void* particleSystem,
     //particleDef
-    double colorR, double colorB, double colorG, double colorA,
-    double flags, double group, double lifetime, double positionX,
-    double positionY, double userData, double velocityX, double velocityY) {
+    double colorR, double colorG, double colorB, double colorA,
+    double flags, void *group, double lifetime, double positionX,
+    double positionY, double velocityX, double velocityY, void *userData) {
   b2ParticleDef def;
   def.color = b2ParticleColor(colorR, colorG, colorB, colorA);
   def.flags = flags;
-  def.group = (b2ParticleGroup*)&group;
+  def.group = (b2ParticleGroup*)group;
   def.lifetime = lifetime;
   def.position = b2Vec2(positionX, positionY);
-  def.userData = (double*)&userData;
+  def.userData = userData;
   def.velocity = b2Vec2(velocityX, velocityY);
 
   return ((b2ParticleSystem*)particleSystem)->CreateParticle(def);

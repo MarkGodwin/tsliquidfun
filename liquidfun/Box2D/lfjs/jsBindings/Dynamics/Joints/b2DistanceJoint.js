@@ -1,5 +1,5 @@
 /**@constructor*/
-function b2DistanceJoint(def) {
+export function b2DistanceJoint(def) {
   this.bodyA = def.bodyA;
   this.bodyB = def.bodyB;
   this.ptr = null;
@@ -27,7 +27,7 @@ var b2DistanceJointDef_InitializeAndCreate = Module.cwrap("b2DistanceJointDef_In
     'number', 'number', 'number']);
 
 /**@constructor*/
-function b2DistanceJointDef() {
+export function b2DistanceJointDef() {
   this.bodyA = null;
   this.bodyB = null;
   this.collideConnected = false;

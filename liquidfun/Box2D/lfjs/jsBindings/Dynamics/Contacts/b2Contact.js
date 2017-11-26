@@ -27,7 +27,7 @@ var e_enabledFlag = 4;
 var b2Contact_GetManifold = Module.cwrap('b2Contact_GetManifold', 'number', ['number']);
 var b2Contact_GetWorldManifold = Module.cwrap('b2Contact_GetWorldManifold', 'number', ['number']);
 /**@constructor*/
-function b2Contact(ptr) {
+export function b2Contact(ptr) {
   this.buffer = new DataView(Module.HEAPU8.buffer, ptr);
   this.ptr = ptr;
 }

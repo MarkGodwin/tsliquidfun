@@ -1,5 +1,5 @@
 /**@constructor*/
-function b2AABB() {
+export function b2AABB() {
   this.lowerBound = new b2Vec2();
   this.upperBound = new b2Vec2();
 }
@@ -15,7 +15,7 @@ var b2Manifold_GetPointCount =
   Module.cwrap('b2Manifold_GetPointCount', 'number', ['number']);
 
 /**@constructor*/
-function b2Manifold(ptr) {
+export function b2Manifold(ptr) {
   this.ptr = ptr;
 }
 
@@ -25,7 +25,7 @@ b2Manifold.prototype.GetPointCount = function() {
 
 var b2WorldManifold_points_offset = Offsets.b2WorldManifold.points;
 /**@constructor*/
-function b2WorldManifold(ptr) {
+export function b2WorldManifold(ptr) {
   this.buffer = new DataView(Module.HEAPU8.buffer, ptr);
   this.ptr = ptr;
 }

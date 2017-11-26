@@ -3,7 +3,7 @@ var b2MouseJoint_SetTarget =
     ['number', 'number', 'number']);
 
 /**@constructor*/
-function b2MouseJoint(def) {
+export function b2MouseJoint(def) {
   this.ptr = null;
   this.next = null;
 }
@@ -22,7 +22,7 @@ var b2MouseJointDef_Create = Module.cwrap("b2MouseJointDef_Create",
     'number', 'number']);
 
 /**@constructor*/
-function b2MouseJointDef() {
+export function b2MouseJointDef() {
   // joint def
   this.bodyA = null;
   this.bodyB = null;

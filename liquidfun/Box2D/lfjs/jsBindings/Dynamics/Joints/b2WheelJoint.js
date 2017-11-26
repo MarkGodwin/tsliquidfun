@@ -5,7 +5,7 @@ var b2WheelJoint_SetSpringFrequencyHz =
   Module.cwrap('b2WheelJoint_SetSpringFrequencyHz', 'null', ['number', 'number']);
 
 /**@constructor*/
-function b2WheelJoint(def) {
+export function b2WheelJoint(def) {
   this.next = null;
   this.ptr = null;
 }
@@ -43,7 +43,7 @@ var b2WheelJointDef_InitializeAndCreate = Module.cwrap("b2WheelJointDef_Initiali
     'number', 'number']);
 
 /** @constructor*/
-function b2WheelJointDef() {
+export function b2WheelJointDef() {
   // joint def
   this.bodyA = null;
   this.bodyB = null;
