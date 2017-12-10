@@ -18,7 +18,8 @@ void* b2World_CreateParticleSystem(
     double lifetimeGranularity, double powderStrength, double pressureStrength,
     double radius, double repulsiveStrength, double springStrength,
     double staticPressureIterations, double staticPressureRelaxation, double staticPressureStrength,
-    double surfaceTensionNormalStrength, double surfaceTensionPressureStrength, double viscousStrength);
+    double surfaceTensionNormalStrength, double surfaceTensionPressureStrength, double viscousStrength,
+    double categoryBits, double groupIndex, double maskBits);
 
 
 void b2World_Delete(void* world);
@@ -32,6 +33,8 @@ void b2World_RayCast(void* world, double point1X, double point1Y,
 void b2World_SetContactListener(void* world);
 void b2World_SetGravity(void* world, double x, double y);
 void b2World_Step(void* world, float step, float vIterations, float pIterations);
+void b2World_ClearForces(void *world);
+void b2World_SetAutoClearForces(void *world, float autoClear);
 }
 
 #endif

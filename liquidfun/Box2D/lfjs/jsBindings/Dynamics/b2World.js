@@ -60,6 +60,7 @@ var b2World_CreateParticleSystem =
      'number', 'number', 'number',
      'number', 'number', 'number',
      'number', 'number', 'number',
+     'number', 'number', 'number',
      'number', 'number', 'number']);
 
 var b2World_DestroyBody =
@@ -83,6 +84,8 @@ var b2World_SetContactListener = Module.cwrap('b2World_SetContactListener', 'nul
 var b2World_SetGravity = Module.cwrap('b2World_SetGravity', 'null',
   ['number', 'number', 'number']);
 var b2World_Step = Module.cwrap('b2World_Step', 'null', ['number', 'number', 'number']);
+var b2World_ClearForces = Module.cwrap('b2World_ClearForces', 'null', ['number']);
+var b2World_SetAutoClearForces = Module.cwrap('b2World_SetAutoClearForces', 'null', ['number', 'number']);
 
 var _transBuf = null;
 var _vec2Buf = null;
@@ -157,7 +160,7 @@ b2World.prototype.CreateParticleSystem = function(psd) {
     psd.pressureStrength, psd.radius, psd.repulsiveStrength,
     psd.springStrength, psd.staticPressureIterations, psd.staticPressureRelaxation,
     psd.staticPressureStrength, psd.surfaceTensionNormalStrength, psd.surfaceTensionPressureStrength,
-    psd.viscousStrength));
+    psd.viscousStrength, psd.filter.categoryBits, psd.filter.groupIndex, psd.filter.maskBits));
   b2World._Push(ps, this.particleSystems);
   ps.dampingStrength = psd.dampingStrength;
   ps.radius = psd.radius;
@@ -202,3 +205,13 @@ b2World.prototype.SetGravity = function(gravity) {
 b2World.prototype.Step = function(steps, vIterations, pIterations) {
   b2World_Step(this.ptr, steps, vIterations, pIterations);
 };
+
+b2World.prototype.ClearForces = function ()
+{
+    b2World_ClearForces(this.ptr);
+}
+
+b2World.prototype.SetAutoClearForces = function (autoClear)
+{
+    b2World_SetAutoClearForces(this.ptr, autoClear);
+}

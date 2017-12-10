@@ -29,6 +29,10 @@ public:
 	{
 		// Disable the selection of wall and barrier particles for this test.
 		InitializeParticleParameters(b2_wallParticle | b2_barrierParticle);
+		b2Filter psfd;
+		psfd.categoryBits = 0x1;
+		psfd.maskBits = (unsigned short)~0x2;
+		m_particleSystem->SetFilterData(psfd);
 
 		{
 			b2BodyDef bd;
@@ -75,6 +79,7 @@ public:
 			b2ParticleGroupDef pd;
 			pd.shape = &shape;
 			pd.flags = TestMain::GetParticleParameterValue();
+			pd.flags |= b2_fixtureContactFilterParticle;
 			b2ParticleGroup * const group =
 				m_particleSystem->CreateParticleGroup(pd);
 			if (pd.flags & b2_colorMixingParticle)
@@ -100,8 +105,12 @@ public:
 			bd.type = b2_dynamicBody;
 			b2Body* body = m_world->CreateBody(&bd);
 			b2PolygonShape shape;
+			b2FixtureDef fd;
+			fd.density = 0.1f;
+			fd.shape = &shape;
+			fd.filter.categoryBits = 0x2;
 			shape.SetAsBox(0.1f, 0.1f, b2Vec2(-1, 0.5f), 0);
-			body->CreateFixture(&shape, 0.1f);
+			body->CreateFixture(&fd);
 			m_particleSystem->DestroyParticlesInShape(shape,
 													  body->GetTransform());
 		}

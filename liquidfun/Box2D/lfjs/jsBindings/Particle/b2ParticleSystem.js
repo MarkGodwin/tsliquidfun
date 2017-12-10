@@ -19,6 +19,7 @@ export function b2ParticleSystemDef() {
   this.surfaceTensionNormalStrength = 0.2;
   this.surfaceTensionPressureStrength = 0.2;
   this.viscousStrength = 0.25;
+  this.filter = new b2Filter();
 }
 
 var b2ParticleSystem_CreateParticle =

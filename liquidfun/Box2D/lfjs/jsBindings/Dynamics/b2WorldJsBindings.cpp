@@ -93,7 +93,8 @@ void* b2World_CreateParticleSystem(
     double lifetimeGranularity, double powderStrength, double pressureStrength,
     double radius, double repulsiveStrength, double springStrength,
     double staticPressureIterations, double staticPressureRelaxation, double staticPressureStrength,
-    double surfaceTensionNormalStrength, double surfaceTensionPressureStrength, double viscousStrength) {
+    double surfaceTensionNormalStrength, double surfaceTensionPressureStrength, double viscousStrength,
+    double categoryBits, double groupIndex, double maskBits) {
   b2ParticleSystemDef def;
   def.colorMixingStrength = colorMixingStrength;
   def.dampingStrength = dampingStrength;
@@ -112,6 +113,9 @@ void* b2World_CreateParticleSystem(
   def.surfaceTensionNormalStrength = surfaceTensionNormalStrength;
   def.surfaceTensionPressureStrength = surfaceTensionPressureStrength;
   def.viscousStrength = viscousStrength;
+  def.filter.categoryBits = categoryBits;
+  def.filter.groupIndex = groupIndex;
+  def.filter.maskBits = maskBits;
 
   return ((b2World*)world)->CreateParticleSystem(&def);
 }
@@ -156,4 +160,12 @@ void b2World_SetGravity(void* world, double x, double y) {
 
 void b2World_Step(void* world, float step, float vIterations, float pIterations) {
   ((b2World*)world)->Step(step, (int32)vIterations, (int32)pIterations, 3);
+}
+
+void b2World_ClearForces(void *world) {
+	((b2World*)world)->ClearForces();
+}
+
+void b2World_SetAutoClearForces(void *world, float autoClear) {
+	((b2World*)world)->SetAutoClearForces((bool)autoClear);
 }
