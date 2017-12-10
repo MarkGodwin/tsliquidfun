@@ -22,6 +22,7 @@
 #include <Box2D/Common/b2GrowableBuffer.h>
 #include <Box2D/Particle/b2Particle.h>
 #include <Box2D/Dynamics/b2TimeStep.h>
+#include <Box2D/Dynamics/b2Fixture.h>
 
 #if LIQUIDFUN_UNIT_TESTS
 #include <gtest/gtest.h>
@@ -275,6 +276,9 @@ struct b2ParticleSystemDef
 	/// With the value set to 1/60 the maximum lifetime or age of a particle is
 	/// 2.27 years.
 	float32 lifetimeGranularity;
+
+	/// Filter for particle system->fixture contacts
+	b2Filter filter;
 };
 
 
@@ -393,6 +397,13 @@ public:
 
 	/// Get all existing particle group flags.
 	uint32 GetAllGroupFlags() const;
+
+	/// Set the contact filtering data for filtering contacts between particles and fixtures
+	void SetFilterData(const b2Filter& filter);
+
+	/// Get the contact filtering data.
+	const b2Filter& GetFilterData() const;
+
 
 	/// Pause or unpause the particle system. When paused, b2World::Step()
 	/// skips over this particle system. All b2ParticleSystem function calls
@@ -1142,6 +1153,7 @@ private:
 	b2ParticleGroup* m_groupList;
 
 	b2ParticleSystemDef m_def;
+	b2Filter m_filter;
 
 	b2World* m_world;
 	b2ParticleSystem* m_prev;
@@ -1402,6 +1414,16 @@ inline uint32 b2ParticleSystem::GetAllParticleFlags() const
 inline uint32 b2ParticleSystem::GetAllGroupFlags() const
 {
 	return m_allGroupFlags;
+}
+
+inline void b2ParticleSystem::SetFilterData(const b2Filter &filter)
+{
+	m_filter = filter;
+}
+
+inline const b2Filter& b2ParticleSystem::GetFilterData() const
+{
+	return m_filter;
 }
 
 inline const uint32* b2ParticleSystem::GetFlagsBuffer() const
