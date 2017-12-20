@@ -1,16 +1,18 @@
 // global call back functions
-var world = null;
+var worlds = new Map();
 
-b2World.BeginContactBody = function (contactPtr)
+b2World.BeginContactBody = function (worldPtr, contactPtr)
 {
+  var world = worlds.get(worldPtr);
   if (world.listener.BeginContactBody === undefined) {
     return;
   }
-  var contact = new b2Contact(contactPtr);
+  var contact = new b2Contact(worldPtr, contactPtr);
   world.listener.BeginContactBody(contact);
 };
 
-b2World.EndContactBody = function(contactPtr) {
+b2World.EndContactBody = function (worldPtr, contactPtr) {
+  var world = worlds.get(worldPtr);
   if (world.listener.EndContactBody === undefined) {
     return;
   }
@@ -18,14 +20,16 @@ b2World.EndContactBody = function(contactPtr) {
   world.listener.EndContactBody(contact);
 };
 
-b2World.PreSolve = function(contactPtr, oldManifoldPtr) {
+b2World.PreSolve = function (worldPtr, contactPtr, oldManifoldPtr) {
+  var world = worlds.get(worldPtr);
   if (world.listener.PreSolve === undefined) {
     return;
   }
   world.listener.PreSolve(new b2Contact(contactPtr), new b2Manifold(oldManifoldPtr));
 };
 
-b2World.PostSolve = function(contactPtr, impulsePtr) {
+b2World.PostSolve = function (worldPtr, contactPtr, impulsePtr) {
+  var world = worlds.get(worldPtr);
   if (world.listener.PostSolve === undefined) {
     return;
   }
@@ -33,17 +37,20 @@ b2World.PostSolve = function(contactPtr, impulsePtr) {
     new b2ContactImpulse(impulsePtr));
 };
 
-b2World.QueryAABB = function(fixturePtr) {
+b2World.QueryAABB = function (worldPtr, fixturePtr) {
+  var world = worlds.get(worldPtr);
   return world.queryAABBCallback.ReportFixture(world.fixturesLookup[fixturePtr]);
 };
 
-b2World.RayCast = function(fixturePtr, pointX, pointY, normalX, normalY, fraction) {
+b2World.RayCast = function (worldPtr, fixturePtr, pointX, pointY, normalX, normalY, fraction) {
+  var world = worlds.get(worldPtr);
   return world.rayCastCallback.ReportFixture(world.fixturesLookup[fixturePtr],
     new b2Vec2(pointX, pointY), new b2Vec2(normalX, normalY), fraction);
 };
 
 // Emscripten exports
 var b2World_Create = Module.cwrap('b2World_Create', 'number', ['number', 'number']);
+var b2World_Delete = Module.cwrap('b2World_Delete', 'null', ['number']);
 var b2World_CreateBody =
   Module.cwrap('b2World_CreateBody', 'number',
     ['number', 'number', 'number',
@@ -94,7 +101,6 @@ var _vec2Buf = null;
 /** @constructor */
 export function b2World(gravity)
 {
-  world = this;
   this.bodies = [];
   this.bodiesLookup = {};
   this.fixturesLookup = {};
@@ -102,6 +108,7 @@ export function b2World(gravity)
   this.listener = null;
   this.particleSystems = [];
   this.ptr = b2World_Create(gravity.x, gravity.y);
+  worlds.set(this.ptr, this);
   this.queryAABBCallback = null;
   this.rayCastCallback = null;
 
@@ -115,6 +122,11 @@ export function b2World(gravity)
   nDataBytes = 2 * Float32Array.BYTES_PER_ELEMENT;
   dataPtr = Module._malloc(nDataBytes);
   _vec2Buf = new Uint8Array(Module.HEAPU8.buffer, dataPtr, nDataBytes);
+}
+
+b2World.prototype.Delete = function () {
+    worlds.delete(this.ptr);
+    b2World_Delete(this.ptr);
 }
 
 b2World._Push = function(item, list) {
@@ -185,12 +197,14 @@ b2World.prototype.DestroyParticleSystem = function(particleSystem) {
 b2World.prototype.QueryAABB = function(callback, aabb) {
   this.queryAABBCallback = callback;
   b2World_QueryAABB(this.ptr, aabb.lowerBound.x, aabb.lowerBound.y,
-    aabb.upperBound.x, aabb.upperBound.y);
+      aabb.upperBound.x, aabb.upperBound.y);
+  this.queryAABBCallback = null;
 };
 
 b2World.prototype.RayCast = function(callback, point1, point2) {
   this.rayCastCallback = callback;
   b2World_RayCast(this.ptr, point1.x, point1.y, point2.x, point2.y);
+  this.rayCastCallback = null;
 };
 
 b2World.prototype.SetContactListener = function(listener) {
