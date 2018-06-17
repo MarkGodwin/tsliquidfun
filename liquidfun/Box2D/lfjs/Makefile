@@ -280,7 +280,7 @@ JSBINDINGS = ./jsBindings/offsets.js \
 	./jsBindings/Particle/b2ParticleGroup.js \
 	./jsBindings/Particle/b2Particle.js
 
-JSBINDINGFLAGS = $(JSBINDINGS:%=--post-js %)
 
 bindings.js:
-	$(EMSCRIPTEN)/emcc -I../ -o lf_core.js jsBindings/jsBindings.cpp $(OBJECTS) -s $(EXPORTS) -s TOTAL_MEMORY=33554432 -O2 --js-library callbacks.js $(JSBINDINGFLAGS)
+	$(EMSCRIPTEN)/emcc -I../ -o lf_core.js jsBindings/jsBindings.cpp $(OBJECTS) -s $(EXPORTS) -s TOTAL_MEMORY=33554432 -O2 --js-library callbacks.js -s 'EXTRA_EXPORTED_RUNTIME_METHODS=["ccall", "cwrap"]' -g1
+	cat lf_core.js $(JSBINDINGS) > liquidfun.js
