@@ -2353,6 +2353,73 @@ void b2ParticleSystem::ComputeAABB(b2AABB* const aabb) const
 	aabb->upperBound.y += m_particleDiameter;
 }
 
+void b2ParticleSystem::ComputeGroupAABBs(b2AABB *groupBoxes) const
+{
+	const int32 particleCount = GetParticleCount();
+
+	const int32 boxCount = m_groupCount + 1;
+	for (int32 i = 0; i < boxCount; i++)
+	{
+		groupBoxes[i].lowerBound.x = +b2_maxFloat;
+		groupBoxes[i].lowerBound.y = +b2_maxFloat;
+		groupBoxes[i].upperBound.x = -b2_maxFloat;
+		groupBoxes[i].upperBound.y = -b2_maxFloat;
+	}
+
+	b2AABB *ungrouped = groupBoxes + boxCount - 1;
+	b2AABB *gb = ungrouped;
+	int32 groupCount = 0;
+	const int32 cnt = m_count;
+	b2ParticleGroup *grpList = m_groupList;
+	b2ParticleGroup *grp = NULL;
+	for (int32 i = 0; i < cnt; i++)
+	{
+		if (grp != NULL && grp->m_lastIndex == i)
+		{
+			grp = NULL;
+			gb = ungrouped;
+		}
+		if (grp == NULL && grpList != NULL)
+		{
+			// Find the next group we should hit - groups aren't stored in any specific order
+			int best = cnt + 1;
+			b2ParticleGroup *g = grpList;
+			do
+			{
+				if (i < g->m_lastIndex && g->m_lastIndex < best)
+				{
+					grp = g;
+					best = grp->m_lastIndex;
+				}
+				g = g->GetNext();
+			} while (g != NULL);
+			if (grp == NULL)
+				grpList = NULL;
+		}
+
+		if (grp != NULL && grp->m_firstIndex == i)
+		{
+			gb = groupBoxes + (groupCount++);
+		}
+
+		b2Vec2 v = m_velocityBuffer.data[i];
+		b2Vec2 p = m_positionBuffer.data[i];
+		gb->lowerBound = b2Min(gb->lowerBound, p);
+		gb->upperBound = b2Max(gb->upperBound, p);
+	}
+
+	for (int32 i = 0; i < boxCount; i++)
+	{
+		if (groupBoxes[i].lowerBound.x != +b2_maxFloat)
+		{
+			groupBoxes[i].lowerBound.x -= m_particleDiameter;
+			groupBoxes[i].lowerBound.y -= m_particleDiameter;
+			groupBoxes[i].upperBound.x += m_particleDiameter;
+			groupBoxes[i].upperBound.y += m_particleDiameter;
+		}
+	}
+}
+
 // Associate a memory allocator with this object.
 FixedSetAllocator::FixedSetAllocator(
 		b2StackAllocator* allocator) :
@@ -2695,9 +2762,27 @@ void b2ParticleSystem::UpdateBodyContacts()
 		}
 	} callback(this, GetFixtureContactFilter());
 
-	b2AABB aabb;
-	ComputeAABB(&aabb);
-	m_world->QueryAABB(&callback, aabb);
+	const int32 boxCount = m_groupCount + 1;
+	b2AABB *aabb = (b2AABB *)m_world->m_stackAllocator.Allocate(sizeof(b2AABB *) * boxCount);
+	ComputeGroupAABBs(aabb);
+	for (int32 i = 0; i < boxCount; i++)
+	{
+		if (aabb[i].lowerBound.x == b2_maxFloat)
+			continue;
+
+		int32 j;
+		for (j = i + 1; j < boxCount; j++)
+		{
+			if (b2TestOverlap(aabb[i], aabb[j]))
+			{
+				aabb[j].Combine(aabb[i]);
+				break;
+			}
+		}
+		if (j == boxCount)
+			m_world->QueryAABB(&callback, aabb[i]);
+	}
+	m_world->m_stackAllocator.Free(aabb);
 
 	if (m_def.strictContactCheck)
 	{
@@ -2755,19 +2840,66 @@ void b2ParticleSystem::SolveCollision(const b2TimeStep& step)
 	// and modifies velocities of them so that they will move just in front of
 	// boundary. This function function also applies the reaction force to
 	// bodies as precisely as the numerical stability is kept.
-	b2AABB aabb;
-	aabb.lowerBound.x = +b2_maxFloat;
-	aabb.lowerBound.y = +b2_maxFloat;
-	aabb.upperBound.x = -b2_maxFloat;
-	aabb.upperBound.y = -b2_maxFloat;
+	if (m_count == 0)
+		return;
+
+	int32 boxCount = m_groupCount + 1;
+	b2AABB *groupBoxes = (b2AABB *)m_world->m_stackAllocator.Allocate(sizeof(b2AABB *) * boxCount);
+	for (int32 i = 0; i < boxCount; i++)
+	{
+		groupBoxes[i].lowerBound.x = +b2_maxFloat;
+		groupBoxes[i].lowerBound.y = +b2_maxFloat;
+		groupBoxes[i].upperBound.x = -b2_maxFloat;
+		groupBoxes[i].upperBound.y = -b2_maxFloat;
+	}
+
+	b2AABB *ungrouped = groupBoxes + boxCount - 1;
+	b2AABB *gb = ungrouped;
+	int32 groupCount = 0;
+	int32 cnt = m_count;
+	b2ParticleGroup *grpList = m_groupList;
+	b2ParticleGroup *grp = NULL;
 	for (int32 i = 0; i < m_count; i++)
 	{
+		if (grp != NULL && grp->m_lastIndex == i)
+		{
+			grp = NULL;
+			gb = ungrouped;
+		}
+		if (grp == NULL && grpList != NULL)
+		{
+			// Find the next group we should hit - groups aren't stored in any specific order
+			int best = m_count + 1;
+			b2ParticleGroup *g = grpList;
+			do
+			{
+				if (i < g->m_lastIndex && g->m_lastIndex < best)
+				{
+					grp = g;
+					best = grp->m_lastIndex;
+				}
+				g = g->GetNext();
+			} while (g != NULL);
+			if (grp == NULL)
+				grpList = NULL;
+		}
+
+		if (grp != NULL && grp->m_firstIndex == i)
+		{
+			gb = groupBoxes + (groupCount++);
+		}
+
 		b2Vec2 v = m_velocityBuffer.data[i];
 		b2Vec2 p1 = m_positionBuffer.data[i];
 		b2Vec2 p2 = p1 + step.dt * v;
-		aabb.lowerBound = b2Min(aabb.lowerBound, b2Min(p1, p2));
-		aabb.upperBound = b2Max(aabb.upperBound, b2Max(p1, p2));
+		gb->lowerBound = b2Min(gb->lowerBound, b2Min(p1, p2));
+		gb->upperBound = b2Max(gb->upperBound, b2Max(p1, p2));
 	}
+
+	if (ungrouped->lowerBound.x == +b2_maxFloat)
+		boxCount--;
+
+
 	class SolveCollisionCallback : public b2FixtureParticleQueryCallback
 	{
 		// Call the contact filter if it's set, to determine whether to
@@ -2848,7 +2980,24 @@ void b2ParticleSystem::SolveCollision(const b2TimeStep& step)
 			m_contactFilter = contactFilter;
 		}
 	} callback(this, step, GetFixtureContactFilter());
-	m_world->QueryAABB(&callback, aabb);
+
+	// For each group, either combine it with another group that it (reasonably) overlaps, or call the collision...
+	for (int32 i = 0; i < boxCount; i++)
+	{
+		int32 j;
+		for (j = i + 1; j < boxCount; j++)
+		{
+			if (b2TestOverlap(groupBoxes[i], groupBoxes[j]))
+			{
+				groupBoxes[j].Combine(groupBoxes[i]);
+				break;
+			}
+		}
+		if(j == boxCount)
+			m_world->QueryAABB(&callback, groupBoxes[i]);
+	}
+
+	m_world->m_stackAllocator.Free(groupBoxes);
 }
 
 void b2ParticleSystem::SolveBarrier(const b2TimeStep& step)
