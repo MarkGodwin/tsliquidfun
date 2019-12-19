@@ -2355,7 +2355,6 @@ void b2ParticleSystem::ComputeAABB(b2AABB* const aabb) const
 
 void b2ParticleSystem::ComputeGroupAABBs(b2AABB *groupBoxes) const
 {
-	const int32 particleCount = GetParticleCount();
 
 	const int32 boxCount = m_groupCount + 1;
 	for (int32 i = 0; i < boxCount; i++)
@@ -2369,7 +2368,7 @@ void b2ParticleSystem::ComputeGroupAABBs(b2AABB *groupBoxes) const
 	b2AABB *ungrouped = groupBoxes + boxCount - 1;
 	b2AABB *gb = ungrouped;
 	int32 groupCount = 0;
-	const int32 cnt = m_count;
+	const int32 cnt = GetParticleCount();
 	b2ParticleGroup *grpList = m_groupList;
 	b2ParticleGroup *grp = NULL;
 	for (int32 i = 0; i < cnt; i++)
@@ -2402,7 +2401,6 @@ void b2ParticleSystem::ComputeGroupAABBs(b2AABB *groupBoxes) const
 			gb = groupBoxes + (groupCount++);
 		}
 
-		b2Vec2 v = m_velocityBuffer.data[i];
 		b2Vec2 p = m_positionBuffer.data[i];
 		gb->lowerBound = b2Min(gb->lowerBound, p);
 		gb->upperBound = b2Max(gb->upperBound, p);
@@ -2840,7 +2838,8 @@ void b2ParticleSystem::SolveCollision(const b2TimeStep& step)
 	// and modifies velocities of them so that they will move just in front of
 	// boundary. This function function also applies the reaction force to
 	// bodies as precisely as the numerical stability is kept.
-	if (m_count == 0)
+	const int32 cnt = GetParticleCount();
+	if (cnt == 0)
 		return;
 
 	int32 boxCount = m_groupCount + 1;
@@ -2856,10 +2855,9 @@ void b2ParticleSystem::SolveCollision(const b2TimeStep& step)
 	b2AABB *ungrouped = groupBoxes + boxCount - 1;
 	b2AABB *gb = ungrouped;
 	int32 groupCount = 0;
-	int32 cnt = m_count;
 	b2ParticleGroup *grpList = m_groupList;
 	b2ParticleGroup *grp = NULL;
-	for (int32 i = 0; i < m_count; i++)
+	for (int32 i = 0; i < cnt; i++)
 	{
 		if (grp != NULL && grp->m_lastIndex == i)
 		{
@@ -2869,7 +2867,7 @@ void b2ParticleSystem::SolveCollision(const b2TimeStep& step)
 		if (grp == NULL && grpList != NULL)
 		{
 			// Find the next group we should hit - groups aren't stored in any specific order
-			int best = m_count + 1;
+			int best = cnt + 1;
 			b2ParticleGroup *g = grpList;
 			do
 			{
