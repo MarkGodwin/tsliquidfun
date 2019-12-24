@@ -2378,7 +2378,7 @@ bool b2ParticleSystem::ComputeGroupAABBs(b2AABB &ungrouped, float32 step)
 
 	for (int32 i = 0; i < cnt; i++)
 	{
-		b2ParticleGroup *grp = m_groupBuffer[i];
+		b2ParticleGroup *grp = groupBuffer[i];
 		b2AABB *aabb = grp == NULL || !grp->HasAABB() ? &ungrouped : &grp->m_aabb;
 
 		if (includeVelocity)
