@@ -266,7 +266,7 @@ public:
 	/// This is calculated during the world step, so will not include particles
 	/// that have just been added/removed. Only solid, rigid and groups
 	/// with b2_trackAabb maintain an AABB
-	void GetAABB(b2AABB &aabb);
+	const b2AABB &GetAABB();
 
 	/// Returns true, if this group tracks an AABB. Only solid, rigid and groups
 	/// with b2_trackAabb maintain an AABB
@@ -411,6 +411,11 @@ inline void b2ParticleGroup::SetUserData(void* data)
 inline void b2ParticleGroup::DestroyParticles()
 {
 	DestroyParticles(false);
+}
+
+inline const b2AABB &b2ParticleGroup::GetAABB()
+{
+	return m_aabb;
 }
 
 #if LIQUIDFUN_EXTERNAL_LANGUAGE_API
