@@ -64,6 +64,8 @@ void b2Fixture::Create(b2BlockAllocator* allocator, b2Body* body, const b2Fixtur
 	m_proxyCount = 0;
 
 	m_density = def->density;
+
+	m_lastPassId = UINT32_MAX;
 }
 
 void b2Fixture::Destroy(b2BlockAllocator* allocator)

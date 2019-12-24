@@ -423,6 +423,7 @@ void b2World::SetAllowSleeping(bool flag)
 // Initialize the world with a specified gravity.
 void b2World::Init(const b2Vec2& gravity)
 {
+	m_unique = 0;
 	m_destructionListener = NULL;
 	m_debugDraw = NULL;
 

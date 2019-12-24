@@ -200,6 +200,14 @@ public:
 	/// Dump this fixture to the log file.
 	void Dump(int32 bodyIndex);
 
+	/// Keeps track of whether a fixture has been processed before
+	bool SeenInPass(uint32 passId) {
+		if (m_lastPassId == passId)
+			return true;
+		m_lastPassId = passId;
+		return false;
+	}
+
 protected:
 
 	friend class b2Body;
@@ -234,6 +242,8 @@ protected:
 	int32 m_proxyCount;
 
 	b2Filter m_filter;
+
+	uint32 m_lastPassId;
 
 	bool m_isSensor;
 

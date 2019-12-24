@@ -19,6 +19,7 @@
 #define B2_PARTICLE_GROUP
 
 #include <Box2D/Particle/b2Particle.h>
+#include <Box2D/Collision/b2Collision.h>
 
 class b2Shape;
 class b2World;
@@ -40,10 +41,12 @@ enum b2ParticleGroupFlag
 	b2_rigidParticleGroup = 1 << 1,
 	/// Won't be destroyed if it gets empty.
 	b2_particleGroupCanBeEmpty = 1 << 2,
+	/// Keep track of an AABB for this group
+	b2_trackAabb = 1 << 3,
 	/// Will be destroyed on next simulation step.
-	b2_particleGroupWillBeDestroyed = 1 << 3,
+	b2_particleGroupWillBeDestroyed = 1 << 4,
 	/// Updates depth data on next simulation step.
-	b2_particleGroupNeedsUpdateDepth = 1 << 4,
+	b2_particleGroupNeedsUpdateDepth = 1 << 5,
 	b2_particleGroupInternalMask =
 		b2_particleGroupWillBeDestroyed |
 		b2_particleGroupNeedsUpdateDepth,
@@ -259,6 +262,18 @@ public:
 	/// @warning This function is locked during callbacks.
 	void DestroyParticles();
 
+	/// Gets the approximate AABB for all of the particles in the group.
+	/// This is calculated during the world step, so will not include particles
+	/// that have just been added/removed. Only solid, rigid and groups
+	/// with b2_trackAabb maintain an AABB
+	void GetAABB(b2AABB &aabb);
+
+	/// Returns true, if this group tracks an AABB. Only solid, rigid and groups
+	/// with b2_trackAabb maintain an AABB
+	bool HasAABB() {
+		return m_groupFlags & (b2_trackAabb | b2_solidParticleGroup | b2_rigidParticleGroup);
+	}
+
 private:
 
 	friend class b2ParticleSystem;
@@ -277,6 +292,7 @@ private:
 	mutable b2Vec2 m_linearVelocity;
 	mutable float32 m_angularVelocity;
 	mutable b2Transform m_transform;
+	b2AABB m_aabb;
 
 	void* m_userData;
 

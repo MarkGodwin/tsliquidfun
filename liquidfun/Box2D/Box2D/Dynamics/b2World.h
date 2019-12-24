@@ -282,6 +282,11 @@ public:
 	void SetGravity(float32 gravityX, float32 gravityY);
 #endif // LIQUIDFUN_EXTERNAL_LANGUAGE_API
 
+	/// Get a number that has never been seen before.
+	uint32 GetNextUnique() {
+		return m_unique++;
+	}
+
 private:
 
 	// m_flags
@@ -345,6 +350,8 @@ private:
 	/// the static library.
 	const b2Version *m_liquidFunVersion;
 	const char *m_liquidFunVersionString;
+
+	uint32 m_unique;
 };
 
 inline b2Body* b2World::GetBodyList()

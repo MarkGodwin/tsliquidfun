@@ -696,10 +696,12 @@ public:
 	/// @param aabb Returns the axis-aligned bounding box of the system.
 	void ComputeAABB(b2AABB* const aabb) const;
 
-	/// Compute the axis-aligned bounding box for all groups of particles contained
-	/// within this particle system, plus an AABB for any un-grouped particles
-	/// @param aabb Returns the axis-aligned bounding box of the system. Call with a buffer of m_groupCount + 1
-	void ComputeGroupAABBs(b2AABB *aabb) const;
+	/// Updates the axis-aligned bounding box for all groups of particles that
+	/// keep track of their AABB (those that return true from HasAABB)
+	/// within this particle system, plus an AABB for any remaining particles
+	/// @param aabb Returns the axis-aligned bounding box of the remaining particles
+	/// @param step Time step for adjusting AABB by particle velocity.
+	bool ComputeGroupAABBs(b2AABB &aabb, float32 step);
 
 
 #if LIQUIDFUN_EXTERNAL_LANGUAGE_API
