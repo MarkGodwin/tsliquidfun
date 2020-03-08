@@ -1118,10 +1118,34 @@ void b2ParticleSystem::JoinParticleGroups(b2ParticleGroup* groupA,
 	}
 
 	b2Assert(groupA != groupB);
+
+	// Special case for merging with an empty group
+	if(groupA->m_firstIndex == groupA->m_lastIndex)
+	{
+		// Reassign the particles in group B to group A
+		groupA->m_firstIndex = groupB->m_firstIndex;
+		groupA->m_lastIndex = groupB->m_lastIndex;
+		for(int32 i = groupA->m_firstIndex; i < groupA->m_lastIndex; i++)
+		{
+			m_groupBuffer[i] = groupA;
+		}
+		uint32 groupFlags = groupA->m_groupFlags | groupB->m_groupFlags;
+		SetGroupFlags(groupA, groupFlags);
+		groupB->m_firstIndex = groupB->m_lastIndex;
+		DestroyParticleGroup(groupB);
+		return;
+	}
+	else if(groupB->m_firstIndex == groupB->m_lastIndex)
+	{
+		// Merging in an empty group is a no-op. Delete the empty group
+		DestroyParticleGroup(groupB);
+		return;
+	}
+
 	RotateBuffer(groupB->m_firstIndex, groupB->m_lastIndex, m_count);
 	b2Assert(groupB->m_lastIndex == m_count);
 	RotateBuffer(groupA->m_firstIndex, groupA->m_lastIndex,
-				 groupB->m_firstIndex);
+		groupB->m_firstIndex);
 	b2Assert(groupA->m_lastIndex == groupB->m_firstIndex);
 
 	// Create pairs and triads connecting groupA and groupB.
@@ -1130,8 +1154,8 @@ void b2ParticleSystem::JoinParticleGroups(b2ParticleGroup* groupA,
 		bool ShouldCreatePair(int32 a, int32 b) const
 		{
 			return
-				(a < m_threshold && m_threshold <= b) ||
-				(b < m_threshold && m_threshold <= a);
+				(a < m_threshold &&m_threshold <= b) ||
+				(b < m_threshold &&m_threshold <= a);
 		}
 		bool ShouldCreateTriad(int32 a, int32 b, int32 c) const
 		{
@@ -1149,7 +1173,7 @@ void b2ParticleSystem::JoinParticleGroups(b2ParticleGroup* groupA,
 	UpdateContacts(true);
 	UpdatePairsAndTriads(groupA->m_firstIndex, groupB->m_lastIndex, filter);
 
-	for (int32 i = groupB->m_firstIndex; i < groupB->m_lastIndex; i++)
+	for(int32 i = groupB->m_firstIndex; i < groupB->m_lastIndex; i++)
 	{
 		m_groupBuffer[i] = groupA;
 	}
