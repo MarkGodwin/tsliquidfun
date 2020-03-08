@@ -30,7 +30,7 @@ b2ChainShape::~b2ChainShape()
 	m_count = 0;
 }
 
-void b2ChainShape::CreateLoop(const b2Vec2* vertices, int32 count)
+void b2ChainShape::CreateLoop(const b2Vec2* vertices, int32 count, bool interpolate)
 {
 	b2Assert(m_vertices == NULL && m_count == 0);
 	b2Assert(count >= 3);
@@ -52,9 +52,10 @@ void b2ChainShape::CreateLoop(const b2Vec2* vertices, int32 count)
 	m_nextVertex = m_vertices[1];
 	m_hasPrevVertex = true;
 	m_hasNextVertex = true;
+	m_interpolate = interpolate;
 }
 
-void b2ChainShape::CreateChain(const b2Vec2* vertices, int32 count)
+void b2ChainShape::CreateChain(const b2Vec2* vertices, int32 count, bool interpolate)
 {
 	b2Assert(m_vertices == NULL && m_count == 0);
 	b2Assert(count >= 2);
@@ -74,6 +75,7 @@ void b2ChainShape::CreateChain(const b2Vec2* vertices, int32 count)
 
 	m_hasPrevVertex = false;
 	m_hasNextVertex = false;
+	m_interpolate = interpolate;
 
 	m_prevVertex.SetZero();
 	m_nextVertex.SetZero();
@@ -100,6 +102,7 @@ b2Shape* b2ChainShape::Clone(b2BlockAllocator* allocator) const
 	clone->m_nextVertex = m_nextVertex;
 	clone->m_hasPrevVertex = m_hasPrevVertex;
 	clone->m_hasNextVertex = m_hasNextVertex;
+	clone->m_interpolate = m_interpolate;
 	return clone;
 }
 
@@ -114,6 +117,7 @@ void b2ChainShape::GetChildEdge(b2EdgeShape* edge, int32 index) const
 	b2Assert(0 <= index && index < m_count - 1);
 	edge->m_type = b2Shape::e_edge;
 	edge->m_radius = m_radius;
+	edge->m_interpolate = m_interpolate;
 
 	edge->m_vertex1 = m_vertices[index + 0];
 	edge->m_vertex2 = m_vertices[index + 1];
@@ -161,16 +165,7 @@ bool b2ChainShape::RayCast(b2RayCastOutput* output, const b2RayCastInput& input,
 	b2Assert(childIndex < m_count);
 
 	b2EdgeShape edgeShape;
-
-	int32 i1 = childIndex;
-	int32 i2 = childIndex + 1;
-	if (i2 == m_count)
-	{
-		i2 = 0;
-	}
-
-	edgeShape.m_vertex1 = m_vertices[i1];
-	edgeShape.m_vertex2 = m_vertices[i2];
+	GetChildEdge(&edgeShape, childIndex);
 
 	return edgeShape.RayCast(output, input, xf, 0);
 }

@@ -41,12 +41,13 @@ public:
 	/// Create a loop. This automatically adjusts connectivity.
 	/// @param vertices an array of vertices, these are copied
 	/// @param count the vertex count
-	void CreateLoop(const b2Vec2* vertices, int32 count);
+	/// @param interpolate Should the edge normal be interpolated (for ray-casts only, currently)
+	void CreateLoop(const b2Vec2* vertices, int32 count, bool interpolate = false);
 
 	/// Create a chain with isolated end vertices.
 	/// @param vertices an array of vertices, these are copied
-	/// @param count the vertex count
-	void CreateChain(const b2Vec2* vertices, int32 count);
+	/// @param count the vertex count (for ray-casts only, currently)
+	void CreateChain(const b2Vec2* vertices, int32 count, bool interpolate = false);
 
 	/// Establish connectivity to a vertex that precedes the first vertex.
 	/// Don't call this for loops.
@@ -91,6 +92,7 @@ public:
 
 	b2Vec2 m_prevVertex, m_nextVertex;
 	bool m_hasPrevVertex, m_hasNextVertex;
+	bool m_interpolate;
 };
 
 inline b2ChainShape::b2ChainShape()
@@ -101,6 +103,7 @@ inline b2ChainShape::b2ChainShape()
 	m_count = 0;
 	m_hasPrevVertex = false;
 	m_hasNextVertex = false;
+	m_interpolate = false;
 }
 
 #endif

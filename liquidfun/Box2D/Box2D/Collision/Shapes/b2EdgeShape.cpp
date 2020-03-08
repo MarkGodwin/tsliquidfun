@@ -131,6 +131,39 @@ bool b2EdgeShape::RayCast(b2RayCastOutput* output, const b2RayCastInput& input,
 		return false;
 	}
 
+	if(m_interpolate && (m_hasVertex0 || m_hasVertex3))
+	{
+		b2Vec2 startNormal = normal;
+		b2Vec2 endNormal = normal;
+		if(m_hasVertex0)
+		{
+			b2Vec2 se = m_vertex1 - m_vertex0;
+			b2Vec2 prevNormal(se.y, -se.x);
+			prevNormal.Normalize();
+			startNormal += prevNormal;
+			startNormal.Normalize();
+		}
+		if(m_hasVertex3)
+		{
+			b2Vec2 ee = m_vertex3 - m_vertex2;
+			b2Vec2 nextNormal(ee.y, -ee.x);
+			nextNormal.Normalize();
+			endNormal += nextNormal;
+			endNormal.Normalize();
+		}
+
+		// Work out where along this edge the ray has hit - we know it has!
+		b2Vec2 rayNormal(d.y, -d.x);
+		rayNormal.Normalize();
+		float32 numerator = b2Dot(rayNormal, p1 - v1);
+		float32 denominator = b2Dot(rayNormal, e);
+		float32 weight = numerator / denominator;
+
+		// Interpolate between the start and end normals
+		normal = startNormal * (1.0f - weight) + endNormal * weight;
+		normal.Normalize();
+	}
+
 	output->fraction = t;
 	if (numerator > 0.0f)
 	{

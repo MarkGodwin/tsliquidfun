@@ -33,6 +33,10 @@ public:
 	/// Set this as an isolated edge.
 	void Set(const b2Vec2& v1, const b2Vec2& v2);
 
+	void SetPrevVertex(const b2Vec2 &v0);
+	void SetNextVertex(const b2Vec2 &v3);
+	void SetInterpolate(bool interpolate);
+
 	/// Implement b2Shape.
 	b2Shape* Clone(b2BlockAllocator* allocator) const;
 
@@ -67,7 +71,9 @@ public:
 	/// Optional adjacent vertices. These are used for smooth collision.
 	b2Vec2 m_vertex0, m_vertex3;
 	bool m_hasVertex0, m_hasVertex3;
+	bool m_interpolate;
 };
+
 
 inline b2EdgeShape::b2EdgeShape()
 {
@@ -79,6 +85,24 @@ inline b2EdgeShape::b2EdgeShape()
 	m_vertex3.y = 0.0f;
 	m_hasVertex0 = false;
 	m_hasVertex3 = false;
+	m_interpolate = false;
+}
+
+inline void b2EdgeShape::SetPrevVertex(const b2Vec2 &v0)
+{
+	m_vertex0 = v0;
+	m_hasVertex0 = true;
+}
+
+inline void b2EdgeShape::SetNextVertex(const b2Vec2 &v3)
+{
+	m_vertex3 = v3;
+	m_hasVertex3 = true;
+}
+
+inline void b2EdgeShape::SetInterpolate(bool interpolate)
+{
+	m_interpolate = interpolate;
 }
 
 #if LIQUIDFUN_EXTERNAL_LANGUAGE_API
