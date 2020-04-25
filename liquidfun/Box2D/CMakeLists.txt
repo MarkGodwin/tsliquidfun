@@ -71,7 +71,7 @@ include("flags.cmake")
 
 set(C_FLAGS_WARNINGS "")
 if(MSVC)
-  set(C_FLAGS_WARNINGS "/W4 /WX")
+  set(C_FLAGS_WARNINGS "/W4 /WX- -D_SILENCE_TR1_NAMESPACE_DEPRECATION_WARNING")
 elseif(CMAKE_COMPILER_IS_GNUCC OR CMAKE_COMPILER_IS_GNUCXX OR
        CMAKE_COMPILER_IS_CLANGXX)
   # Set the maximum warning level for gcc.
@@ -161,10 +161,10 @@ endif()
 # Override / reset the output directory for all targets.
 set(LIB_OUTPUT_DIR "${OUTPUT_SUBDIR}")
 set(EXE_OUTPUT_DIR "${OUTPUT_SUBDIR}")
-foreach(target ${ALL_TARGETS})
-  set_target_properties(
-    ${target} PROPERTIES
-    ARCHIVE_OUTPUT_DIRECTORY "${LIB_OUTPUT_DIR}"
-    LIBRARY_OUTPUT_DIRECTORY "${LIB_OUTPUT_DIR}"
-    RUNTIME_OUTPUT_DIRECTORY "${EXE_OUTPUT_DIR}")
-endforeach(target)
+#foreach(target ${ALL_TARGETS})
+#  set_target_properties(
+#    ${target} PROPERTIES
+#    ARCHIVE_OUTPUT_DIRECTORY "${LIB_OUTPUT_DIR}"
+#    LIBRARY_OUTPUT_DIRECTORY "${LIB_OUTPUT_DIR}"
+#    RUNTIME_OUTPUT_DIRECTORY "${EXE_OUTPUT_DIR}")
+#endforeach(target)

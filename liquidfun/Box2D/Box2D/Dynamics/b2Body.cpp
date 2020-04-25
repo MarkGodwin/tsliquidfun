@@ -272,6 +272,7 @@ void b2Body::DestroyFixture(b2Fixture* fixture)
 		fixture->DestroyProxies(broadPhase);
 	}
 
+	float32 density = fixture->m_density;
 	fixture->Destroy(allocator);
 	fixture->m_body = NULL;
 	fixture->m_next = NULL;
@@ -280,8 +281,9 @@ void b2Body::DestroyFixture(b2Fixture* fixture)
 
 	--m_fixtureCount;
 
-	// Reset the mass data.
-	ResetMassData();
+	// Reset the mass data, if the fixture affected the calculated mass
+	if(density != 0.0f)
+		ResetMassData();
 }
 
 void b2Body::ResetMassData()
