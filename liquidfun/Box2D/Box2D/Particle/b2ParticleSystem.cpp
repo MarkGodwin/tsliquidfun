@@ -1457,26 +1457,43 @@ int32 b2ParticleSystem::CloneParticle(int32 oldIndex, b2ParticleGroup* group)
 
 void b2ParticleSystem::UpdatePairsAndTriadsWithReactiveParticles()
 {
+	if (m_allParticleFlags & b2_groupReactiveParticle)
+	{
+		for (b2ParticleGroup *grp = m_groupList; grp != NULL; grp = grp->GetNext())
+		{
+			if (grp->GetAllParticleFlags() & b2_groupReactiveParticle)
+				UpdatePairsAndTriadsWithFlags(grp->m_firstIndex, grp->m_lastIndex, b2_groupReactiveParticle);
+		}
+	}
+	if (m_allParticleFlags & b2_reactiveParticle)
+	{
+		UpdatePairsAndTriadsWithFlags(0, m_count, b2_reactiveParticle);
+	}
+	for (int32 i = 0; i < m_count; i++)
+	{
+		m_flagsBuffer.data[i] &= ~(b2_reactiveParticle | b2_groupReactiveParticle);
+	}
+	m_allParticleFlags &= ~(b2_reactiveParticle | b2_groupReactiveParticle);
+}
+
+void b2ParticleSystem::UpdatePairsAndTriadsWithFlags(unsigned int firstIndex, unsigned int lastIndex, b2ParticleFlag flags)
+{
 	class ReactiveFilter : public ConnectionFilter
 	{
 		bool IsNecessary(int32 index) const
 		{
-			return (m_flagsBuffer[index] & b2_reactiveParticle) != 0;
+			return (m_flagsBuffer[index] & m_flags) != 0;
 		}
 		const uint32* m_flagsBuffer;
+		b2ParticleFlag m_flags;
 	public:
-		ReactiveFilter(uint32* flagsBuffer)
+		ReactiveFilter(uint32* flagsBuffer, b2ParticleFlag flags)
 		{
 			m_flagsBuffer = flagsBuffer;
+			m_flags = flags;
 		}
-	} filter(m_flagsBuffer.data);
-	UpdatePairsAndTriads(0, m_count, filter);
-
-	for (int32 i = 0; i < m_count; i++)
-	{
-		m_flagsBuffer.data[i] &= ~b2_reactiveParticle;
-	}
-	m_allParticleFlags &= ~b2_reactiveParticle;
+	} filter(m_flagsBuffer.data, flags);
+	UpdatePairsAndTriads(firstIndex, lastIndex, filter);
 }
 
 static bool ParticleCanBeConnected(
@@ -3123,7 +3140,7 @@ void b2ParticleSystem::Solve(const b2TimeStep& step)
 		{
 			ComputeDepth();
 		}
-		if (m_allParticleFlags & b2_reactiveParticle)
+		if (m_allParticleFlags & (b2_reactiveParticle | b2_groupReactiveParticle))
 		{
 			UpdatePairsAndTriadsWithReactiveParticles();
 		}

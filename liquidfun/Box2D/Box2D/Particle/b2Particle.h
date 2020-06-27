@@ -75,6 +75,8 @@ enum b2ParticleFlag
 	/// Call b2ContactFilter when this particle interacts with other
 	/// particles.
 	b2_particleContactFilterParticle = 1 << 17,
+	///  Makes pairs or triads with other particles in the same group
+	b2_groupReactiveParticle = 1 << 18,
 };
 
 /// Small color object for each particle

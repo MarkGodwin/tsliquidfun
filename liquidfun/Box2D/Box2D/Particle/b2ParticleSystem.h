@@ -909,6 +909,7 @@ private:
 	void UpdatePairsAndTriads(
 		int32 firstIndex, int32 lastIndex, const ConnectionFilter& filter);
 	void UpdatePairsAndTriadsWithReactiveParticles();
+	void UpdatePairsAndTriadsWithFlags(unsigned int firstIndex, unsigned int lastIndex, b2ParticleFlag flags);
 	static bool ComparePairIndices(const b2ParticlePair& a, const b2ParticlePair& b);
 	static bool MatchPairIndices(const b2ParticlePair& a, const b2ParticlePair& b);
 	static bool CompareTriadIndices(const b2ParticleTriad& a, const b2ParticleTriad& b);
