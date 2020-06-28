@@ -3910,14 +3910,14 @@ void b2ParticleSystem::SolveColorMixing()
 			const b2ParticleContact& contact = m_contactBuffer[k];
 			int32 a = contact.GetIndexA();
 			int32 b = contact.GetIndexB();
-			if (m_flagsBuffer.data[a] & m_flagsBuffer.data[b] &
-				b2_colorMixingParticle)
+			b2ParticleFlag mixFlags = (b2ParticleFlag)(m_flagsBuffer.data[a] & m_flagsBuffer.data[b] & b2_colorMixingParticle);
+			if (mixFlags)
 			{
 				b2ParticleColor& colorA = m_colorBuffer.data[a];
 				b2ParticleColor& colorB = m_colorBuffer.data[b];
 				// Use the static method to ensure certain compilers inline
 				// this correctly.
-				b2ParticleColor::MixColors(&colorA, &colorB, colorMixing128);
+				b2ParticleColor::MixColors(&colorA, &colorB, colorMixing128, mixFlags);
 			}
 		}
 	}

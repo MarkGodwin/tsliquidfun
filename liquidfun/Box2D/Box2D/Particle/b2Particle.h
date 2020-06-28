@@ -46,8 +46,8 @@ enum b2ParticleFlag
 	b2_powderParticle = 1 << 6,
 	/// With surface tension.
 	b2_tensileParticle = 1 << 7,
-	/// Mix color between contacting particles.
-	b2_colorMixingParticle = 1 << 8,
+	/// Mix Red channel between contacting particles
+	b2_colorMixingParticleRed = 1 << 8,
 	/// Call b2DestructionListener on destruction.
 	b2_destructionListenerParticle = 1 << 9,
 	/// Prevents other particles from leaking.
@@ -77,6 +77,14 @@ enum b2ParticleFlag
 	b2_particleContactFilterParticle = 1 << 17,
 	///  Makes pairs or triads with other particles in the same group
 	b2_groupReactiveParticle = 1 << 18,
+	///. Mix green channel between contacting particles
+	b2_colorMixingParticleGreen = 1 << 19,
+	///. Mix blue channel between contacting particles
+	b2_colorMixingParticleBlue = 1 << 20,
+	///. Mix alpha channel between contacting particles
+	b2_colorMixingParticleAlpha = 1 << 21,
+	/// Mix color between contacting particles.
+	b2_colorMixingParticle = b2_colorMixingParticleRed | b2_colorMixingParticleGreen | b2_colorMixingParticleBlue | b2_colorMixingParticleAlpha,
 };
 
 /// Small color object for each particle
@@ -214,7 +222,7 @@ public:
 	/// alpha channel value between 0.0f..0.5f.
 	b2Inline void Mix(b2ParticleColor * const mixColor, const int32 strength)
 	{
-		MixColors(this, mixColor, strength);
+		MixColors(this, mixColor, strength, b2_colorMixingParticle);
 	}
 
 	/// Mix colorA with colorB using strength to control how much of
@@ -224,24 +232,37 @@ public:
 	/// alpha channel value between 0.0f..0.5f.
 	static b2Inline void MixColors(b2ParticleColor * const colorA,
 							 b2ParticleColor * const colorB,
-							 const int32 strength)
+							 const int32 strength,
+							 const b2ParticleFlag mixingFlags)
 	{
-		const uint8 dr = (uint8)((strength * (colorB->r - colorA->r)) >>
-								 k_bitsPerComponent);
-		const uint8 dg = (uint8)((strength * (colorB->g - colorA->g)) >>
-								 k_bitsPerComponent);
-		const uint8 db = (uint8)((strength * (colorB->b - colorA->b)) >>
-								 k_bitsPerComponent);
-		const uint8 da = (uint8)((strength * (colorB->a - colorA->a)) >>
-								 k_bitsPerComponent);
-		colorA->r += dr;
-		colorA->g += dg;
-		colorA->b += db;
-		colorA->a += da;
-		colorB->r -= dr;
-		colorB->g -= dg;
-		colorB->b -= db;
-		colorB->a -= da;
+		if (mixingFlags & b2_colorMixingParticleRed)
+		{
+			const uint8 dr = (uint8)((strength * (colorB->r - colorA->r)) >>
+									 k_bitsPerComponent);
+			colorA->r += dr;
+			colorB->r -= dr;
+		}
+		if (mixingFlags & b2_colorMixingParticleGreen)
+		{
+			const uint8 dg = (uint8)((strength * (colorB->g - colorA->g)) >>
+									 k_bitsPerComponent);
+			colorA->g += dg;
+			colorB->g -= dg;
+		}
+		if (mixingFlags & b2_colorMixingParticleBlue)
+		{
+			const uint8 db = (uint8)((strength * (colorB->b - colorA->b)) >>
+									 k_bitsPerComponent);
+			colorA->b += db;
+			colorB->b -= db;
+		}
+		if (mixingFlags & b2_colorMixingParticleAlpha)
+		{
+			const uint8 da = (uint8)((strength * (colorB->a - colorA->a)) >>
+									 k_bitsPerComponent);
+			colorA->a += da;
+			colorB->a -= da;
+		}
 	}
 
 private:
