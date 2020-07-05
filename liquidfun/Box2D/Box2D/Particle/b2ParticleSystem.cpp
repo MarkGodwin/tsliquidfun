@@ -1257,7 +1257,7 @@ b2ParticleGroupDef *b2ParticleSystem::SnapshotParticleGroup(const b2ParticleGrou
 	b2Vec2 *velocityData = (b2Vec2 *)m_world->m_blockAllocator.Allocate(sizeof(b2Vec2) * groupCount);
 	b2ParticleColor *colorData = (b2ParticleColor *)(m_colorBuffer.data ? m_world->m_blockAllocator.Allocate(sizeof(b2ParticleColor) * groupCount) : NULL);
 	void **particleUserData = (void **)(m_userDataBuffer.data ? m_world->m_blockAllocator.Allocate(sizeof(void *) * groupCount) : NULL);
-	float *lifetimeData = (float *)(m_expirationTimeBuffer.data ? m_world->m_blockAllocator.Allocate(sizeof(float) * groupCount) : NULL);
+	float *lifetimeData = (float32 *)(m_expirationTimeBuffer.data ? m_world->m_blockAllocator.Allocate(sizeof(float32) * groupCount) : NULL);
 
 	// Save what we need to from the particles.
 	memcpy(flagsData, m_flagsBuffer.data + firstIndex, sizeof(uint32) * groupCount);
@@ -1386,14 +1386,15 @@ void b2ParticleSystem::FreeParticleSnapshot(b2ParticleGroupDef *def)
 		m_world->m_blockAllocator.Free((void *)def->colorData, sizeof(b2ParticleColor) * def->particleCount);
 		def->colorData = NULL;
 	}
-	if (def->userData)
+	if (def->particleUserData)
 	{
-		m_world->m_blockAllocator.Free((void *)def->userData, sizeof(void *) * def->particleCount);
-		def->userData = NULL;
+		m_world->m_blockAllocator.Free((void *)def->particleUserData, sizeof(void *) * def->particleCount);
+		def->particleUserData = NULL;
 	}
 	if (def->lifetimeData)
 	{
 		m_world->m_blockAllocator.Free((void *)def->lifetimeData, sizeof(float) * def->particleCount);
+		def->lifetimeData = NULL;
 	}
 	if (def->triadData)
 	{

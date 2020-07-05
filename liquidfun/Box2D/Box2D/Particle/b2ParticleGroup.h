@@ -158,7 +158,7 @@ struct b2ParticleGroupDef
 	const b2ParticleColor *colorData;
 
 	/// The lifetime of the particleCount particles (optional)
-	const float *lifetimeData;
+	const float32 *lifetimeData;
 
 	/// The initial user data of the particleCount particles (optional)
 	void * const *particleUserData;
