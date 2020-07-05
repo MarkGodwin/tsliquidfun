@@ -1061,13 +1061,26 @@ b2ParticleGroup* b2ParticleSystem::CreateParticleGroup(
 		CreateParticlesWithShapesForGroup(
 					groupDef.shapes, groupDef.shapeCount, groupDef, transform);
 	}
+	int32 lastShapeIndex = m_count;
 	if (groupDef.particleCount)
 	{
 		b2Assert(groupDef.positionData);
 		for (int32 i = 0; i < groupDef.particleCount; i++)
 		{
 			b2Vec2 p = groupDef.positionData[i];
-			CreateParticleForGroup(groupDef, transform, p);
+
+			b2ParticleDef particleDef;
+			particleDef.flags = groupDef.flagsData ? groupDef.flagsData[i] : groupDef.flags;
+			particleDef.position = groupDef.velocityData ? p : b2Mul(transform, p); // Only apply transform if we're not also specifying velocities etc. (i.e. from snapshot)
+			particleDef.velocity = groupDef.velocityData ? groupDef.velocityData[i] : (
+				// Use group definition if velocity buffer isn't specified
+				groupDef.linearVelocity +
+				b2Cross(groupDef.angularVelocity,
+						particleDef.position - groupDef.position));
+			particleDef.color = groupDef.colorData ? groupDef.colorData[i] : groupDef.color;
+			particleDef.lifetime = groupDef.lifetimeData ? groupDef.lifetimeData[i] : groupDef.lifetime;
+			particleDef.userData = groupDef.particleUserData ? groupDef.particleUserData[i] : groupDef.userData;
+			CreateParticle(particleDef);
 		}
 	}
 	int32 lastIndex = m_count;
@@ -1097,7 +1110,36 @@ b2ParticleGroup* b2ParticleSystem::CreateParticleGroup(
 	// Create pairs and triads between particles in the group.
 	ConnectionFilter filter;
 	UpdateContacts(true);
-	UpdatePairsAndTriads(firstIndex, lastIndex, filter);
+	UpdatePairsAndTriads(firstIndex, groupDef.triadCount || groupDef.pairCount ? lastShapeIndex : lastIndex, filter);
+	if (groupDef.triadCount)
+	{
+		// Restore triads
+		for (int32 i = 0; i < groupDef.triadCount; i++)
+		{
+			b2ParticleTriad &newTriad = m_triadBuffer.Append();
+			newTriad = groupDef.triadData[i];
+			newTriad.indexA += lastShapeIndex;
+			newTriad.indexB += lastShapeIndex;
+			newTriad.indexC += lastShapeIndex;
+		}
+		// Sorting is not really necessary, as the triads should already be sorted in the snapshot. 
+		// However, the triads may have been composed by hand, so let's sort anyway. We only need to sort our added
+		// triads, as the group particles are already at the end of the list
+		std::stable_sort(m_triadBuffer.End() - groupDef.triadCount, m_triadBuffer.End(), CompareTriadIndices);
+	}
+
+	if (groupDef.pairCount)
+	{
+		// Restore pairs
+		for (int32 i = 0; i < groupDef.pairCount; i++)
+		{
+			b2ParticlePair newPair = m_pairBuffer.Append();
+			newPair = groupDef.pairData[i];
+			newPair.indexA += lastShapeIndex;
+			newPair.indexB += lastShapeIndex;
+		}
+		std::stable_sort(m_pairBuffer.End() - groupDef.pairCount, m_pairBuffer.End(), ComparePairIndices);
+	}
 
 	if (groupDef.group)
 	{
@@ -1201,6 +1243,170 @@ void b2ParticleSystem::SplitParticleGroup(b2ParticleGroup* group)
 	CreateParticleGroupsFromParticleList(group, nodeBuffer, survivingList);
 	UpdatePairsAndTriadsWithParticleList(group, nodeBuffer);
 	m_world->m_stackAllocator.Free(nodeBuffer);
+}
+
+b2ParticleGroupDef *b2ParticleSystem::SnapshotParticleGroup(const b2ParticleGroup *group)
+{
+	b2ParticleGroupDef *def = new (m_world->m_blockAllocator.Allocate(sizeof(b2ParticleGroupDef))) b2ParticleGroupDef();
+
+	const uint32 firstIndex = group->m_firstIndex;
+	const uint32 lastIndex = group->m_lastIndex;
+	uint32 groupCount = lastIndex - firstIndex;
+	uint32 *flagsData = (uint32 *)m_world->m_blockAllocator.Allocate(sizeof(uint32) * groupCount);
+	b2Vec2 *positionData = (b2Vec2 *)m_world->m_blockAllocator.Allocate(sizeof(b2Vec2) * groupCount);
+	b2Vec2 *velocityData = (b2Vec2 *)m_world->m_blockAllocator.Allocate(sizeof(b2Vec2) * groupCount);
+	b2ParticleColor *colorData = (b2ParticleColor *)(m_colorBuffer.data ? m_world->m_blockAllocator.Allocate(sizeof(b2ParticleColor) * groupCount) : NULL);
+	void **particleUserData = (void **)(m_userDataBuffer.data ? m_world->m_blockAllocator.Allocate(sizeof(void *) * groupCount) : NULL);
+	float *lifetimeData = (float *)(m_expirationTimeBuffer.data ? m_world->m_blockAllocator.Allocate(sizeof(float) * groupCount) : NULL);
+
+	// Save what we need to from the particles.
+	memcpy(flagsData, m_flagsBuffer.data + firstIndex, sizeof(uint32) * groupCount);
+	memcpy(positionData, m_positionBuffer.data + firstIndex, sizeof(b2Vec2) * groupCount);
+	memcpy(velocityData, m_velocityBuffer.data + firstIndex, sizeof(b2Vec2) * groupCount);
+	if(m_colorBuffer.data)
+		memcpy(colorData, m_colorBuffer.data + firstIndex, sizeof(b2ParticleColor) * groupCount);
+	if (m_userDataBuffer.data)
+		memcpy(colorData, m_userDataBuffer.data + firstIndex, sizeof(void *) * groupCount);
+	if (m_expirationTimeBuffer.data)
+	{
+		for (int32 i = 0; i < groupCount; i++)
+			lifetimeData[i] = ExpirationTimeToLifetime(m_expirationTimeBuffer.data[i + firstIndex]);
+	}
+
+	// Count the triads contained in this group (excluding any triads joining with other groups...)
+	int32 triadCount = 0;
+	int32 firstTriad = -1;
+	int32 lastTriad = -1;
+	for (int32 i = 0; i < m_triadBuffer.GetCount(); i++)
+	{
+		if (m_triadBuffer[i].indexA >= firstIndex && m_triadBuffer[i].indexA < lastIndex &&
+			m_triadBuffer[i].indexB >= firstIndex && m_triadBuffer[i].indexB < lastIndex &&
+			m_triadBuffer[i].indexC >= firstIndex && m_triadBuffer[i].indexC < lastIndex)
+		{
+			if (firstIndex == -1)
+				firstTriad = i;
+			lastTriad = i;
+			triadCount++;
+		}
+	}
+
+	b2ParticleTriad *triads = NULL;
+	if (triadCount > 0)
+	{
+		triads = (b2ParticleTriad *)m_world->m_blockAllocator.Allocate(sizeof(b2ParticleTriad) * triadCount);
+		triadCount = 0;
+		for (int32 i = firstTriad; i <= lastTriad; i++)
+		{
+			if (m_triadBuffer[i].indexA >= firstIndex && m_triadBuffer[i].indexA < lastIndex &&
+				m_triadBuffer[i].indexB >= firstIndex && m_triadBuffer[i].indexB < lastIndex &&
+				m_triadBuffer[i].indexC >= firstIndex && m_triadBuffer[i].indexC < lastIndex)
+			{
+				triads[triadCount] = m_triadBuffer[i];
+				// Rebase
+				triads[triadCount].indexA -= firstIndex;
+				triads[triadCount].indexB -= firstIndex;
+				triads[triadCount].indexC -= firstIndex;
+				triadCount++;
+			}
+		}
+	}
+
+	// Count the pairs contained in this group
+	int32 pairCount = 0;
+	int32 firstPair = -1;
+	int32 lastPair = -1;
+	for (int32 i = 0; i < m_pairBuffer.GetCount(); i++)
+	{
+		if (m_pairBuffer[i].indexA >= firstIndex && m_pairBuffer[i].indexA < lastIndex &&
+			m_pairBuffer[i].indexB >= firstIndex && m_pairBuffer[i].indexB < lastIndex)
+		{
+			if (firstPair == -1)
+				firstPair = i;
+			lastPair = i;
+			pairCount++;
+		}
+	}
+
+	b2ParticlePair *pairs = NULL;
+	if (pairCount > 0)
+	{
+		pairs = (b2ParticlePair *)m_world->m_blockAllocator.Allocate(sizeof(b2ParticlePair) * pairCount);
+		pairCount = 0;
+		for (int32 i = firstPair; i < lastPair; i++)
+		{
+			if (m_pairBuffer[i].indexA >= firstIndex && m_pairBuffer[i].indexA < lastIndex &&
+				m_pairBuffer[i].indexB >= firstIndex && m_pairBuffer[i].indexB < lastIndex)
+			{
+				pairs[pairCount] = m_pairBuffer[i];
+				pairs[pairCount].indexA -= firstIndex;
+				pairs[pairCount].indexB -= firstIndex;
+				pairCount++;
+			}
+		}
+	}
+
+	def->particleCount = groupCount;
+	def->positionData = positionData;
+	def->velocityData = velocityData;
+	def->flagsData = flagsData;
+	def->colorData = colorData;
+	def->particleUserData = particleUserData;
+	def->lifetimeData = lifetimeData;
+	def->triadCount = triadCount;
+	def->triadData = triads;
+	def->pairCount = pairCount;
+	def->pairData = pairs;
+	def->groupFlags = group->m_groupFlags;
+	def->strength = group->m_strength;
+	def->userData = group->m_userData;
+
+	return def;
+}
+
+
+void b2ParticleSystem::FreeParticleSnapshot(b2ParticleGroupDef *def)
+{
+	if (def->positionData)
+	{
+		m_world->m_blockAllocator.Free((void *)def->positionData, sizeof(b2Vec2) * def->particleCount);
+		def->positionData = NULL;
+	}
+	if (def->velocityData)
+	{
+		m_world->m_blockAllocator.Free((void *)def->velocityData, sizeof(b2Vec2) * def->particleCount);
+		def->velocityData = NULL;
+	}
+	if (def->flagsData)
+	{
+		m_world->m_blockAllocator.Free((void *)def->flagsData, sizeof(uint32) * def->particleCount);
+		def->flagsData = NULL;
+	}
+	if (def->colorData)
+	{
+		m_world->m_blockAllocator.Free((void *)def->colorData, sizeof(b2ParticleColor) * def->particleCount);
+		def->colorData = NULL;
+	}
+	if (def->userData)
+	{
+		m_world->m_blockAllocator.Free((void *)def->userData, sizeof(void *) * def->particleCount);
+		def->userData = NULL;
+	}
+	if (def->lifetimeData)
+	{
+		m_world->m_blockAllocator.Free((void *)def->lifetimeData, sizeof(float) * def->particleCount);
+	}
+	if (def->triadData)
+	{
+		m_world->m_blockAllocator.Free((void *)def->triadData, sizeof(b2ParticleTriad) * def->triadCount);
+		def->triadData = NULL;
+	}
+	if (def->pairData)
+	{
+		m_world->m_blockAllocator.Free((void *)def->pairData, sizeof(b2ParticleTriad) * def->pairCount);
+		def->pairData = NULL;
+	}
+
+	m_world->m_blockAllocator.Free(def, sizeof(b2ParticleGroupDef));
 }
 
 void b2ParticleSystem::InitializeParticleLists(
@@ -1507,6 +1713,9 @@ static bool ParticleCanBeConnected(
 void b2ParticleSystem::UpdatePairsAndTriads(
 	int32 firstIndex, int32 lastIndex, const ConnectionFilter& filter)
 {
+	if (firstIndex == lastIndex)
+		return;
+
 	// Create pairs or triads.
 	// All particles in each pair/triad should satisfy the following:
 	// * firstIndex <= index < lastIndex

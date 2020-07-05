@@ -24,7 +24,7 @@ public:
 
 	ElasticParticles()
 	{
-
+		m_snapshot = NULL;
 		{
 			b2BodyDef bd;
 			b2Body* ground = m_world->CreateBody(&bd);
@@ -86,7 +86,7 @@ public:
 			pd.groupFlags = b2_solidParticleGroup;
 			pd.shape = &shape;
 			pd.color.Set(0, 255, 0, 255);
-			m_particleSystem->CreateParticleGroup(pd);
+			m_elasticCircle = m_particleSystem->CreateParticleGroup(pd);
 		}
 
 		{
@@ -114,6 +114,30 @@ public:
 		}
 	}
 
+	void Keyboard(unsigned char key)
+	{
+		switch (key)
+		{
+			case 'S':
+				if (m_elasticCircle != NULL)
+				{
+					m_snapshot = m_particleSystem->SnapshotParticleGroup(m_elasticCircle);
+					m_elasticCircle->DestroyParticles(false);
+					m_elasticCircle = NULL;
+				}
+				break;
+			case 'R':
+				if (m_snapshot != NULL)
+				{
+					m_elasticCircle = m_particleSystem->CreateParticleGroup(*m_snapshot);
+					m_particleSystem->FreeParticleSnapshot(m_snapshot);
+					m_snapshot = NULL;
+				}
+				break;
+		}
+	}
+
+
 	float32 GetDefaultViewZoom() const
 	{
 		return 0.1f;
@@ -123,6 +147,10 @@ public:
 	{
 		return new ElasticParticles;
 	}
+
+	private:
+		b2ParticleGroup *m_elasticCircle;
+		b2ParticleGroupDef *m_snapshot;
 };
 
 #endif

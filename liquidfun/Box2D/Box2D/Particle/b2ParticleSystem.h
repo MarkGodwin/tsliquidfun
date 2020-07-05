@@ -363,6 +363,15 @@ public:
 	/// @warning This function is locked during callbacks.
 	void SplitParticleGroup(b2ParticleGroup* group);
 
+	/// Snapshot the state of all the particles in a group, so it can be restored later.
+	/// Note that the group is not affected by this operation.
+	/// @oaram the groupo to snapshot
+	b2ParticleGroupDef *SnapshotParticleGroup(const b2ParticleGroup *group);
+
+	/// Free memory from a particle snapshot created from SnapshotParticleGroup
+	/// @param snapshot to destroy
+	void FreeParticleSnapshot(b2ParticleGroupDef *snapshot);
+
 	/// Get the world particle group list. With the returned group, use
 	/// b2ParticleGroup::GetNext to get the next group in the world list.
 	/// A NULL group indicates the end of the list.

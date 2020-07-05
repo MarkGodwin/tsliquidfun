@@ -52,6 +52,9 @@ enum b2ParticleGroupFlag
 		b2_particleGroupNeedsUpdateDepth,
 };
 
+struct b2ParticleTriad;
+struct b2ParticlePair;
+
 /// A particle group definition holds all the data needed to construct a
 /// particle group.  You can safely re-use these definitions.
 struct b2ParticleGroupDef
@@ -73,6 +76,15 @@ struct b2ParticleGroupDef
 		stride = 0;
 		particleCount = 0;
 		positionData = NULL;
+		velocityData = NULL;
+		flagsData = NULL;
+		colorData = NULL;
+		lifetimeData = NULL;
+		particleUserData = NULL;
+		triadCount = 0;
+		triadData = NULL;
+		pairCount = 0;
+		pairData = NULL;
 		lifetime = 0.0f;
 		userData = NULL;
 		group = NULL;
@@ -135,6 +147,33 @@ struct b2ParticleGroupDef
 
 	/// The initial positions of the particleCount particles.
 	const b2Vec2* positionData;
+
+	/// The initial velocities of the particleCount particles (optional)
+	const b2Vec2 *velocityData;
+
+	/// The initial flags of the particleCount particles (optional)
+	const uint32 *flagsData;
+
+	/// The initial colors of the particleCount particles (optional)
+	const b2ParticleColor *colorData;
+
+	/// The lifetime of the particleCount particles (optional)
+	const float *lifetimeData;
+
+	/// The initial user data of the particleCount particles (optional)
+	void * const *particleUserData;
+
+	/// The number of triads in the particle group
+	int32 triadCount;
+
+	/// The initial triads of the particleCount particles (optional)
+	const b2ParticleTriad *triadData;
+
+	/// The number of pairs in the particle group
+	int32 pairCount;
+
+	/// The initial pairs of the particleCount particles (optional)
+	const b2ParticlePair *pairData;
 
 	/// Lifetime of the particle group in seconds.  A value <= 0.0f indicates a
 	/// particle group with infinite lifetime.
