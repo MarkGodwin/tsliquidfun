@@ -1266,7 +1266,7 @@ b2ParticleGroupDef *b2ParticleSystem::SnapshotParticleGroup(const b2ParticleGrou
 	if(m_colorBuffer.data)
 		memcpy(colorData, m_colorBuffer.data + firstIndex, sizeof(b2ParticleColor) * groupCount);
 	if (m_userDataBuffer.data)
-		memcpy(colorData, m_userDataBuffer.data + firstIndex, sizeof(void *) * groupCount);
+		memcpy(particleUserData, m_userDataBuffer.data + firstIndex, sizeof(void *) * groupCount);
 	if (m_expirationTimeBuffer.data)
 	{
 		for (int32 i = 0; i < groupCount; i++)
