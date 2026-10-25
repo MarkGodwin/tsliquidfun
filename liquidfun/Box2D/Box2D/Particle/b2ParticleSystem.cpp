@@ -1133,7 +1133,7 @@ b2ParticleGroup* b2ParticleSystem::CreateParticleGroup(
 		// Restore pairs
 		for (int32 i = 0; i < groupDef.pairCount; i++)
 		{
-			b2ParticlePair newPair = m_pairBuffer.Append();
+			b2ParticlePair &newPair = m_pairBuffer.Append();
 			newPair = groupDef.pairData[i];
 			newPair.indexA += lastShapeIndex;
 			newPair.indexB += lastShapeIndex;
@@ -1283,7 +1283,7 @@ b2ParticleGroupDef *b2ParticleSystem::SnapshotParticleGroup(const b2ParticleGrou
 			m_triadBuffer[i].indexB >= firstIndex && m_triadBuffer[i].indexB < lastIndex &&
 			m_triadBuffer[i].indexC >= firstIndex && m_triadBuffer[i].indexC < lastIndex)
 		{
-			if (firstIndex == -1)
+			if (firstTriad == -1)
 				firstTriad = i;
 			lastTriad = i;
 			triadCount++;
@@ -1332,7 +1332,7 @@ b2ParticleGroupDef *b2ParticleSystem::SnapshotParticleGroup(const b2ParticleGrou
 	{
 		pairs = (b2ParticlePair *)m_world->m_blockAllocator.Allocate(sizeof(b2ParticlePair) * pairCount);
 		pairCount = 0;
-		for (int32 i = firstPair; i < lastPair; i++)
+		for (int32 i = firstPair; i <= lastPair; i++)
 		{
 			if (m_pairBuffer[i].indexA >= firstIndex && m_pairBuffer[i].indexA < lastIndex &&
 				m_pairBuffer[i].indexB >= firstIndex && m_pairBuffer[i].indexB < lastIndex)
@@ -1356,7 +1356,7 @@ b2ParticleGroupDef *b2ParticleSystem::SnapshotParticleGroup(const b2ParticleGrou
 	def->triadData = triads;
 	def->pairCount = pairCount;
 	def->pairData = pairs;
-	def->groupFlags = group->m_groupFlags;
+	def->groupFlags = group->GetGroupFlags();
 	def->strength = group->m_strength;
 	def->userData = group->m_userData;
 
@@ -1403,7 +1403,7 @@ void b2ParticleSystem::FreeParticleSnapshot(b2ParticleGroupDef *def)
 	}
 	if (def->pairData)
 	{
-		m_world->m_blockAllocator.Free((void *)def->pairData, sizeof(b2ParticleTriad) * def->pairCount);
+		m_world->m_blockAllocator.Free((void *)def->pairData, sizeof(b2ParticlePair) * def->pairCount);
 		def->pairData = NULL;
 	}
 
@@ -4571,6 +4571,11 @@ void b2ParticleSystem::RotateBuffer(int32 start, int32 mid, int32 end)
 	// update groups
 	for (b2ParticleGroup* group = m_groupList; group; group = group->GetNext())
 	{
+		// Retained empty groups have no particle endpoints to remap. In
+		// particular, lastIndex - 1 belongs to a different group (or is -1).
+		// Mapping it independently can turn an empty range into a negative one.
+		if (group->m_firstIndex == group->m_lastIndex)
+			continue;
 		group->m_firstIndex = newIndices[group->m_firstIndex];
 		group->m_lastIndex = newIndices[group->m_lastIndex - 1] + 1;
 	}
