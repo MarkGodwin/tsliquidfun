@@ -76,6 +76,9 @@ struct Settings
 		drawCOMs = 0;
 		drawStats = 0;
 		drawProfile = 0;
+		drawParticleProfile = 1;
+		adaptiveParticleSort = 0;
+		particleSortVariant = b2_adaptiveRowProxySort;
 		enableWarmStarting = 1;
 		enableContinuous = 1;
 		enableSubStepping = 0;
@@ -103,6 +106,9 @@ struct Settings
 	int32 drawCOMs;
 	int32 drawStats;
 	int32 drawProfile;
+	int32 drawParticleProfile;
+	int32 adaptiveParticleSort;
+	int32 particleSortVariant;
 	int32 enableWarmStarting;
 	int32 enableContinuous;
 	int32 enableSubStepping;
@@ -231,6 +237,10 @@ protected:
 
 	b2Profile m_maxProfile;
 	b2Profile m_totalProfile;
+	b2ParticleSystemProfile m_particleFrameProfile;
+	float32 m_particleFrameMs;
+	int32 m_particleFrameCount;
+	int32 m_particleFrameSorter;
 
 	// Valid particle parameters for this test.
 	ParticleParameter::Value* m_particleParameters;

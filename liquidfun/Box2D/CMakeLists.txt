@@ -1,6 +1,29 @@
-cmake_minimum_required(VERSION 2.8)
+cmake_minimum_required(VERSION 3.5)
 
 project(Box2D)
+
+# The bundled Google Test predates removal of MSVC's std::tr1 tuple.
+if(MSVC AND MSVC_VERSION GREATER_EQUAL 1900)
+  add_definitions(-DGTEST_USE_OWN_TR1_TUPLE=1)
+endif()
+
+option(BOX2D_PROFILE_PARTICLES "Collect detailed particle timings and counters" OFF)
+option(BOX2D_PROFILE_PARTICLE_PROXY_ONLY "Only time combined proxy update/sort; overrides detailed profiling" OFF)
+if(BOX2D_PROFILE_PARTICLE_PROXY_ONLY)
+  add_definitions(-DBOX2D_PROFILE_PARTICLE_PROXY_ONLY=1)
+endif()
+option(BOX2D_VALIDATE_PARTICLE_PROXY_SORT "Shadow-check adaptive proxy sorting" OFF)
+option(BOX2D_BUILD_BENCHMARKS "Build the headless particle sort benchmark" OFF)
+option(BOX2D_TEST_ADAPTIVE_DEFAULT "Test-only: use adaptive sorting in existing test scenes" OFF)
+if(BOX2D_TEST_ADAPTIVE_DEFAULT)
+  add_definitions(-DBOX2D_TEST_ADAPTIVE_DEFAULT=1)
+endif()
+if(BOX2D_PROFILE_PARTICLES)
+  add_definitions(-DBOX2D_PROFILE_PARTICLES=1)
+endif()
+if(BOX2D_VALIDATE_PARTICLE_PROXY_SORT)
+  add_definitions(-DBOX2D_VALIDATE_PARTICLE_PROXY_SORT=1)
+endif()
 
 if(UNIX)
   set(BOX2D_INSTALL_BY_DEFAULT ON)
@@ -118,6 +141,9 @@ endfunction(add_executable)
 
 # The Box2D library.
 add_subdirectory(Box2D)
+if(BOX2D_BUILD_BENCHMARKS)
+  add_subdirectory(Benchmarks)
+endif()
 
 if(BOX2D_BUILD_EXAMPLES)
   # HelloWorld console example.

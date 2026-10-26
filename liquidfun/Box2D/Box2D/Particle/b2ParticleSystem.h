@@ -21,6 +21,7 @@
 #include <Box2D/Common/b2SlabAllocator.h>
 #include <Box2D/Common/b2GrowableBuffer.h>
 #include <Box2D/Particle/b2Particle.h>
+#include <Box2D/Particle/b2ParticleProxySort.h>
 #include <Box2D/Dynamics/b2TimeStep.h>
 
 #ifdef LIQUIDFUN_UNIT_TESTS
@@ -154,6 +155,11 @@ struct b2ParticleSystemDef
 {
 	b2ParticleSystemDef()
 	{
+#ifdef BOX2D_TEST_ADAPTIVE_DEFAULT
+		proxySortMode = b2_adaptiveRowProxySort;
+#else
+		proxySortMode = b2_referenceProxySort;
+#endif
 		strictContactCheck = false;
 		density = 1.0f;
 		gravityScale = 1.0f;
@@ -183,6 +189,8 @@ struct b2ParticleSystemDef
 	/// Enable strict Particle/Body contact check.
 	/// See SetStrictContactCheck for details.
 	bool strictContactCheck;
+	/// Experimental proxy ordering; reference sorting is the production default.
+	b2ParticleProxySortMode proxySortMode;
 
 	/// Set the particle density.
 	/// See SetDensity for details.
@@ -408,6 +416,12 @@ public:
 	/// still work.
 	/// @param paused is true to pause, false to un-pause.
 	void SetPaused(bool paused);
+
+	/// Experimental sorter selection; cannot change while the world is locked.
+	void SetProxySortMode(b2ParticleProxySortMode mode);
+	b2ParticleProxySortMode GetProxySortMode() const { return m_def.proxySortMode; }
+	const b2ParticleSystemProfile& GetParticleProfile() const { return m_particleProfile; }
+	void ResetParticleProfile() { m_particleProfile.Reset(); }
 
 	/// @return true if the particle system is being updated in
 	/// b2World::Step().
@@ -757,6 +771,7 @@ private:
 
 private:
 	friend class b2World;
+	friend class b2ParticleProxySortTestAccess;
 	friend class b2ParticleGroup;
 	friend class b2ParticleBodyContactRemovePredicate;
 	friend class b2FixtureParticleQueryCallback;
@@ -979,6 +994,7 @@ private:
 	void UpdateProxies_Simd(b2GrowableBuffer<Proxy>& proxies) const;
 	void UpdateProxies(b2GrowableBuffer<Proxy>& proxies) const;
 	void SortProxies(b2GrowableBuffer<Proxy>& proxies) const;
+	void UpdateAndSortProxies();
 	void FilterContacts(b2GrowableBuffer<b2ParticleContact>& contacts);
 	void NotifyContactListenerPreContact(
 		b2ParticlePairSet* particlePairs) const;
@@ -1138,6 +1154,10 @@ private:
 	UserOverridableBuffer<int32> m_consecutiveContactStepsBuffer;
 	b2GrowableBuffer<int32> m_stuckParticleBuffer;
 	b2GrowableBuffer<Proxy> m_proxyBuffer;
+	b2ParticleProxySorter<Proxy> m_proxySorter;
+	int32 m_sortedProxyCount;
+	bool m_proxyHistoryValid;
+	mutable b2ParticleSystemProfile m_particleProfile;
 	b2GrowableBuffer<b2ParticleContact> m_contactBuffer;
 	b2GrowableBuffer<b2ParticleBodyContact> m_bodyContactBuffer;
 	b2GrowableBuffer<b2ParticlePair> m_pairBuffer;
@@ -1300,6 +1320,7 @@ inline bool b2ParticleSystem::GetStrictContactCheck() const
 
 inline void b2ParticleSystem::SetRadius(float32 radius)
 {
+	m_proxyHistoryValid = false;
 	m_particleDiameter = 2 * radius;
 	m_squaredDiameter = m_particleDiameter * m_particleDiameter;
 	m_inverseDiameter = 1 / m_particleDiameter;

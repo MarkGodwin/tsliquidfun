@@ -129,6 +129,7 @@ set(BOX2D_Particle_SRCS
 	Particle/b2VoronoiDiagram.cpp
 )
 set(BOX2D_Particle_HDRS
+	Particle/b2ParticleProxySort.h
 	Particle/b2Particle.h
 	Particle/b2ParticleGroup.h
 	Particle/b2ParticleSystem.h

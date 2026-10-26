@@ -48,8 +48,9 @@ namespace
 	TestEntry* entry;
 	Test* test;
 	Settings settings;
-	int32 width = 640;
-	int32 height = 540;
+	// Leave room for the controls and per-frame particle timing overlay.
+	int32 width = 1120;
+	int32 height = 800;
 	int32 framePeriod = 16;
 	int32 mainWindow;
 	float settingsHz = 60.0;
@@ -663,6 +664,14 @@ int main(int argc, char** argv)
 	glui->add_checkbox("Time of Impact", &settings.enableContinuous);
 	glui->add_checkbox("Sub-Stepping", &settings.enableSubStepping);
 	glui->add_checkbox("Strict Particle/Body Contacts", &settings.strictContacts);
+	glui->add_checkbox("Adaptive Particle Sort", &settings.adaptiveParticleSort);
+	GLUI_Listbox* sorterList = glui->add_listbox("Variant", &settings.particleSortVariant);
+	sorterList->add_item(b2_adaptiveRowProxySort, "Original adaptive");
+	sorterList->add_item(b2_insertionProxySort, "Insert while classifying");
+	sorterList->add_item(b2_overflowProxySort, "Overflow + one swap");
+	sorterList->add_item(b2_scanMergeProxySort, "Overflow: direct merge");
+	sorterList->add_item(b2_pairMergeProxySort, "Overflow: pairwise merge");
+	sorterList->add_item(b2_twoStreamProxySort, "All movers to overflow");
 
 	//glui->add_separator();
 
@@ -678,6 +687,7 @@ int main(int argc, char** argv)
 	glui->add_checkbox_to_panel(drawPanel, "Center of Masses", &settings.drawCOMs);
 	glui->add_checkbox_to_panel(drawPanel, "Statistics", &settings.drawStats);
 	glui->add_checkbox_to_panel(drawPanel, "Profile", &settings.drawProfile);
+	glui->add_checkbox_to_panel(drawPanel, "Particle Timings", &settings.drawParticleProfile);
 
 	int32 testCount = 0;
 	TestEntry* e = g_testEntries;

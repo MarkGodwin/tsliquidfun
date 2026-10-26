@@ -4,3 +4,11 @@
 
 /liquidfun/Box2D/.vs
 /.vs
+/build-adaptive*/
+/benchmark-results/
+/liquidfun/Box2D/Unittests/Release/
+/liquidfun/Box2D/Unittests/Debug/
+/liquidfun/Box2D/Unittests/*Tests.ilk
+/liquidfun/Box2D/Unittests/*Tests.pdb
+/build-adaptive
+/liquidfun/Box2D/out

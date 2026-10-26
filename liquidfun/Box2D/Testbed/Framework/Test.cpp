@@ -74,6 +74,9 @@ Test::Test()
 	m_bombSpawning = false;
 
 	m_stepCount = 0;
+	m_particleFrameMs = 0;
+	m_particleFrameCount = 0;
+	m_particleFrameSorter = -1;
 
 	m_mouseWorld = b2Vec2_zero;
 	m_mouseTracing = false;
@@ -375,6 +378,18 @@ void Test::Step(Settings* settings)
 
 	m_pointCount = 0;
 
+	b2ParticleProxySortMode sortMode = settings->adaptiveParticleSort ?
+		(b2ParticleProxySortMode)settings->particleSortVariant : b2_referenceProxySort;
+	// Apply to every system (including Multiple Particle Systems), before
+	// the world locks. Reset counters per call; the overlay separately holds
+	// the last measured step while paused.
+	for (b2ParticleSystem* system = m_world->GetParticleSystemList(); system;
+		system = system->GetNext())
+	{
+		system->SetProxySortMode(sortMode);
+		system->ResetParticleProfile();
+	}
+
 	b2Timer timer;
 	m_world->Step(timeStep,
 		settings->velocityIterations,
@@ -383,6 +398,88 @@ void Test::Step(Settings* settings)
 	settings->stepTimeOut = timer.GetMilliseconds();
 
 	m_world->DrawDebugData();
+
+	if (settings->drawParticleProfile)
+	{
+		bool holdSample = timeStep == 0 && m_particleFrameSorter == sortMode;
+		const char* sortNames[] = {"reference", "original adaptive", "insertion", "overflow", "direct merge", "pairwise merge", "two streams"};
+		m_debugDraw.DrawString(5, m_textLine, "Particle sort: %s | physics frame %.3f ms%s",
+			sortNames[sortMode],
+			timeStep > 0 ? settings->stepTimeOut : (holdSample ? m_particleFrameMs : 0),
+			timeStep > 0 ? "" : " (last measured step; paused)");
+		m_textLine += DRAW_STRING_NEW_LINE;
+#if defined(BOX2D_PROFILE_PARTICLES) || defined(BOX2D_PROFILE_PARTICLE_PROXY_ONLY)
+		b2ParticleSystemProfile total;
+		int32 particles = 0;
+		for (b2ParticleSystem* system = m_world->GetParticleSystemList(); system;
+			system = system->GetNext())
+		{
+			const b2ParticleSystemProfile& p = system->GetParticleProfile();
+			particles += system->GetParticleCount();
+			total.solveMs += p.solveMs; total.proxyMs += p.proxyMs;
+			total.tagMs += p.tagMs; total.orderMs += p.orderMs;
+			total.contactsMs += p.contactsMs; total.bodyContactsMs += p.bodyContactsMs;
+			total.filterListenerMs += p.filterListenerMs; total.collisionMs += p.collisionMs;
+			total.updates += p.updates; total.adaptiveUpdates += p.adaptiveUpdates;
+			total.invalidHistory += p.invalidHistory; total.unorderedHistory += p.unorderedHistory;
+			total.multiRow += p.multiRow; total.repairBudget += p.repairBudget;
+			total.overflowParticles += p.overflowParticles; total.particles += p.particles;
+		}
+		if (holdSample)
+		{
+			total = m_particleFrameProfile;
+			particles = m_particleFrameCount;
+		}
+		else
+		{
+			m_particleFrameProfile = total;
+			m_particleFrameCount = particles;
+		}
+#if defined(BOX2D_PROFILE_PARTICLE_PROXY_ONLY)
+		m_debugDraw.DrawString(5, m_textLine, "%d particles | update + sort %.3f ms (all systems/substeps)", particles, total.proxyMs);
+		m_textLine += DRAW_STRING_NEW_LINE;
+		m_debugDraw.DrawString(5, m_textLine, "Light profiling: nested timers and particle counters disabled");
+		m_textLine += DRAW_STRING_NEW_LINE;
+#else
+		m_debugDraw.DrawString(5, m_textLine, "Per frame, all systems/substeps: %d particles | particles %.3f ms",
+			particles, total.solveMs);
+		m_textLine += DRAW_STRING_NEW_LINE;
+		m_debugDraw.DrawString(5, m_textLine, "Proxy %.3f ms: tags %.3f + order %.3f (includes fallback)",
+			total.proxyMs, total.tagMs, total.orderMs);
+		m_textLine += DRAW_STRING_NEW_LINE;
+		m_debugDraw.DrawString(5, m_textLine, "Particle contacts %.3f | body contacts %.3f ms",
+			total.contactsMs, total.bodyContactsMs);
+		m_textLine += DRAW_STRING_NEW_LINE;
+		m_debugDraw.DrawString(5, m_textLine, "Collision %.3f | filters/listeners %.3f | other particle solve %.3f ms",
+			total.collisionMs, total.filterListenerMs,
+			total.solveMs - total.proxyMs - total.contactsMs - total.bodyContactsMs - total.collisionMs - total.filterListenerMs);
+		m_textLine += DRAW_STRING_NEW_LINE;
+		m_debugDraw.DrawString(5, m_textLine, "Updates %.0f | adaptive %.0f | fallback: history %.0f, jump %.0f, budget %.0f",
+			(double)total.updates, (double)total.adaptiveUpdates,
+			(double)(total.invalidHistory + total.unorderedHistory), (double)total.multiRow, (double)total.repairBudget);
+		m_textLine += DRAW_STRING_NEW_LINE;
+		if (sortMode >= b2_overflowProxySort)
+		{
+			m_debugDraw.DrawString(5, m_textLine, "Overflow (including newborns): %.0f / %.0f proxies (%.1f%%)",
+				(double)total.overflowParticles, (double)total.particles,
+				total.particles ? 100.0 * total.overflowParticles / total.particles : 0);
+			m_textLine += DRAW_STRING_NEW_LINE;
+		}
+#endif
+#else
+		m_debugDraw.DrawString(5, m_textLine, "Detailed timings disabled: build with BOX2D_PROFILE_PARTICLES=ON");
+		m_textLine += DRAW_STRING_NEW_LINE;
+#endif
+		if (!holdSample)
+		{
+			m_particleFrameMs = timeStep > 0 ? settings->stepTimeOut : 0;
+			m_particleFrameSorter = sortMode;
+		}
+#if defined(BOX2D_VALIDATE_PARTICLE_PROXY_SORT)
+		m_debugDraw.DrawString(5, m_textLine, "Shadow validation ON: timings include checking overhead");
+		m_textLine += DRAW_STRING_NEW_LINE;
+#endif
+	}
 
 	if (timeStep > 0.0f)
 	{

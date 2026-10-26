@@ -13,7 +13,7 @@
 # 2. Altered source versions must be plainly marked as such, and must not be
 # misrepresented as being the original software.
 # 3. This notice may not be removed or altered from any source distribution.
-cmake_minimum_required(VERSION 2.8)
+cmake_minimum_required(VERSION 3.5)
 
 # Set some variables describing file locations.
 #
@@ -80,3 +80,4 @@ test_executable(HelloWorld)
 test_executable(IntrusiveList)
 test_executable(SlabAllocator)
 test_executable(TrackedBlock)
+test_executable(ParticleProxySort)

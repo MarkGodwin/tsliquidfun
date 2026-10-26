@@ -388,12 +388,15 @@ b2ParticleSystem::b2ParticleSystem(const b2ParticleSystemDef* def,
 	m_handleAllocator(b2_minParticleSystemBufferCapacity),
 	m_stuckParticleBuffer(world->m_blockAllocator),
 	m_proxyBuffer(world->m_blockAllocator),
+	m_proxySorter(world->m_blockAllocator),
 	m_contactBuffer(world->m_blockAllocator),
 	m_bodyContactBuffer(world->m_blockAllocator),
 	m_pairBuffer(world->m_blockAllocator),
 	m_triadBuffer(world->m_blockAllocator)
 {
 	b2Assert(def);
+	m_sortedProxyCount = 0;
+	m_proxyHistoryValid = false;
 	m_paused = false;
 	m_timestamp = 0;
 	m_allParticleFlags = 0;
@@ -2060,6 +2063,7 @@ b2ParticleSystem::GetInsideBoundsEnumerator(const b2AABB& aabb) const
 inline void b2ParticleSystem::AddContact(int32 a, int32 b,
 	b2GrowableBuffer<b2ParticleContact>& contacts) const
 {
+	B2_PARTICLE_STAT(++m_particleProfile.candidates);
 	b2Vec2 d = m_positionBuffer.data[b] - m_positionBuffer.data[a];
 	float32 distBtParticlesSq = b2Dot(d, d);
 	if (distBtParticlesSq < m_squaredDiameter)
@@ -2412,6 +2416,71 @@ void b2ParticleSystem::SortProxies(b2GrowableBuffer<Proxy>& proxies) const
 	std::sort(proxies.Begin(), proxies.End());
 }
 
+void b2ParticleSystem::SetProxySortMode(b2ParticleProxySortMode mode)
+{
+	b2Assert(!m_world->IsLocked());
+	if (m_world->IsLocked()) return;
+	b2Assert(mode >= b2_referenceProxySort && mode <= b2_twoStreamProxySort);
+	if (mode < b2_referenceProxySort || mode > b2_twoStreamProxySort) return;
+	m_def.proxySortMode = mode;
+}
+
+void b2ParticleSystem::UpdateAndSortProxies()
+{
+	B2_PARTICLE_PROXY_TIMER(proxyTimer, m_particleProfile.proxyMs);
+	int32 count = m_proxyBuffer.GetCount();
+	B2_PARTICLE_STAT(++m_particleProfile.updates; m_particleProfile.particles += count);
+	if (!count)
+	{
+		m_sortedProxyCount = 0; m_proxyHistoryValid = true; return;
+	}
+	if (m_def.proxySortMode != b2_referenceProxySort)
+	{
+		Proxy* updated = m_proxySorter.Prepare(count, m_particleProfile, m_def.proxySortMode);
+		{
+			B2_PARTICLE_TIMER(tagTimer, m_particleProfile.tagMs);
+			for (int32 i = 0; i < count; ++i)
+			{
+				// Appended proxies do not have initialized old tags.
+				updated[i].index = m_proxyBuffer[i].index;
+				const b2Vec2& p = m_positionBuffer.data[updated[i].index];
+				updated[i].tag = computeTag(m_inverseDiameter * p.x, m_inverseDiameter * p.y);
+			}
+		}
+#if defined(BOX2D_VALIDATE_PARTICLE_PROXY_SORT)
+		b2GrowableBuffer<Proxy> reference(m_proxyBuffer);
+		memcpy(reference.Data(), updated, count * sizeof(Proxy));
+		SortProxies(reference);
+#endif
+		m_proxySorter.Sort(m_proxyBuffer.Data(), count, m_sortedProxyCount,
+			m_proxyHistoryValid, m_particleProfile, m_def.proxySortMode);
+#if defined(BOX2D_VALIDATE_PARTICLE_PROXY_SORT)
+		// Check both directions so duplicated output indices cannot conceal
+		// a missing index among proxies with the same tag.
+		if (!AreProxyBuffersTheSame(m_proxyBuffer, reference) ||
+			!AreProxyBuffersTheSame(reference, m_proxyBuffer))
+		{
+			b2Log("Adaptive proxy sort validation failed\n");
+			abort();
+		}
+#endif
+	}
+	else
+	{
+		{
+			B2_PARTICLE_TIMER(tagTimer, m_particleProfile.tagMs);
+			UpdateProxies(m_proxyBuffer);
+		}
+		{
+			B2_PARTICLE_TIMER(orderTimer, m_particleProfile.orderMs);
+			B2_PARTICLE_TIMER(referenceTimer, m_particleProfile.referenceSortMs);
+			SortProxies(m_proxyBuffer);
+		}
+	}
+	m_sortedProxyCount = count;
+	m_proxyHistoryValid = true;
+}
+
 class b2ParticleContactRemovePredicate
 {
 public:
@@ -2508,16 +2577,23 @@ void b2ParticleSystem::NotifyContactListenerPostContact(
 
 void b2ParticleSystem::UpdateContacts(bool exceptZombie)
 {
-	UpdateProxies(m_proxyBuffer);
-	SortProxies(m_proxyBuffer);
+	UpdateAndSortProxies();
 
 	b2ParticlePairSet particlePairs(&m_world->m_stackAllocator);
-	NotifyContactListenerPreContact(&particlePairs);
-
-	FindContacts(m_contactBuffer);
-	FilterContacts(m_contactBuffer);
-
-	NotifyContactListenerPostContact(particlePairs);
+	{
+		B2_PARTICLE_TIMER(listenerTimer, m_particleProfile.filterListenerMs);
+		NotifyContactListenerPreContact(&particlePairs);
+	}
+	{
+		B2_PARTICLE_TIMER(contactTimer, m_particleProfile.contactsMs);
+		FindContacts(m_contactBuffer);
+		B2_PARTICLE_STAT(m_particleProfile.contacts += m_contactBuffer.GetCount());
+	}
+	{
+		B2_PARTICLE_TIMER(filterTimer, m_particleProfile.filterListenerMs);
+		FilterContacts(m_contactBuffer);
+		NotifyContactListenerPostContact(particlePairs);
+	}
 
 	if (exceptZombie)
 	{
@@ -2933,6 +3009,7 @@ void b2ParticleSystem::NotifyBodyContactListenerPostContact(
 
 void b2ParticleSystem::UpdateBodyContacts()
 {
+	B2_PARTICLE_TIMER(bodyTimer, m_particleProfile.bodyContactsMs);
 	// If the particle contact listener is enabled, generate a set of
 	// fixture / particle contacts.
 	FixtureParticleSet fixtureSet(&m_world->m_stackAllocator);
@@ -3086,6 +3163,7 @@ bool b2ParticleSystem::BodyContactCompare(const b2ParticleBodyContact &lhs,
 
 void b2ParticleSystem::SolveCollision(const b2TimeStep& step)
 {
+	B2_PARTICLE_TIMER(collisionTimer, m_particleProfile.collisionMs);
 	// This function detects particles which are crossing boundary of bodies
 	// and modifies velocities of them so that they will move just in front of
 	// boundary. This function function also applies the reaction force to
@@ -3310,6 +3388,7 @@ void b2ParticleSystem::SolveBarrier(const b2TimeStep& step)
 
 void b2ParticleSystem::Solve(const b2TimeStep& step)
 {
+	B2_PARTICLE_TIMER(solveTimer, m_particleProfile.solveMs);
 	if (m_count == 0)
 	{
 		return;
@@ -3340,11 +3419,13 @@ void b2ParticleSystem::Solve(const b2TimeStep& step)
 		m_iterationIndex++)
 	{
 		++m_timestamp;
+		B2_PARTICLE_STAT(++m_particleProfile.substeps);
 		b2TimeStep subStep = step;
 		subStep.dt /= step.particleIterations;
 		subStep.inv_dt *= step.particleIterations;
 		UpdateContacts(false);
 		UpdateBodyContacts();
+		B2_PARTICLE_STAT(m_particleProfile.bodyContacts += m_bodyContactBuffer.GetCount());
 		ComputeWeight();
 		if (m_allGroupFlags & b2_particleGroupNeedsUpdateDepth)
 		{
@@ -4260,7 +4341,13 @@ void b2ParticleSystem::SolveZombie()
 		Proxy& proxy = m_proxyBuffer.Begin()[k];
 		proxy.index = newIndices[proxy.index];
 	}
+	int32 survivingSortedProxies = 0;
+	for (int32 k = 0; k < m_sortedProxyCount; ++k)
+	{
+		if (m_proxyBuffer[k].index >= 0) ++survivingSortedProxies;
+	}
 	m_proxyBuffer.RemoveIf(Test::IsProxyInvalid);
+	m_sortedProxyCount = survivingSortedProxies;
 
 	// update contacts
 	for (int32 k = 0; k < m_contactBuffer.GetCount(); k++)
