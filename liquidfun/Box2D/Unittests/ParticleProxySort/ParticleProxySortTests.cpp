@@ -24,7 +24,7 @@ static b2ParticleSystemProfile Check(std::vector<TestProxy> old,
 {
 	std::vector<TestProxy> original(old);
 	b2ParticleSystemProfile result;
-	for (int mode = b2_adaptiveRowProxySort; mode <= b2_twoStreamProxySort; ++mode)
+	for (int mode = b2_pairMergeProxySort; mode <= b2_twoStreamProxySort; ++mode)
 	{
 		old = original;
 		b2BlockAllocator allocator;
@@ -43,7 +43,7 @@ static b2ParticleSystemProfile Check(std::vector<TestProxy> old,
 			EXPECT_EQ(expected[i].index, old[i].index);
 			EXPECT_EQ(expected[i].tag, old[i].tag);
 		}
-		if (mode == b2_adaptiveRowProxySort) result = profile;
+		if (mode == b2_pairMergeProxySort) result = profile;
 	}
 	return result;
 }
@@ -98,7 +98,7 @@ TEST(ParticleProxySort, RandomizedRowsMoversBirthsAndJumps)
 	}
 }
 
-TEST(ParticleProxySort, FallbackReasonsAndEqualTags)
+TEST(ParticleProxySort, DisorderJumpsAndEqualTags)
 {
 	std::vector<TestProxy> old(1000), updated(1000);
 	for (int i = 0; i < 1000; ++i)
@@ -109,18 +109,18 @@ TEST(ParticleProxySort, FallbackReasonsAndEqualTags)
 	}
 	b2ParticleSystemProfile p = Check(old, updated, 1000);
 #if defined(BOX2D_PROFILE_PARTICLES) && !defined(BOX2D_PROFILE_PARTICLE_PROXY_ONLY)
-	EXPECT_EQ(1u, p.repairBudget);
-	EXPECT_EQ(8000u, p.shifts);
+	EXPECT_EQ(998u, p.overflowParticles);
+	EXPECT_EQ(1u, p.localSwaps);
 #endif
 	updated[0].tag = Tag(500, 0);
 	p = Check(old, updated, 1000);
 #if defined(BOX2D_PROFILE_PARTICLES) && !defined(BOX2D_PROFILE_PARTICLE_PROXY_ONLY)
-	EXPECT_EQ(1u, p.multiRow);
+	EXPECT_GT(p.overflowParticles, 0u);
 #endif
 	std::swap(old[0], old[999]);
 	p = Check(old, old, 1000);
 #if defined(BOX2D_PROFILE_PARTICLES) && !defined(BOX2D_PROFILE_PARTICLE_PROXY_ONLY)
-	EXPECT_EQ(1u, p.unorderedHistory);
+	EXPECT_GT(p.overflowParticles, 0u);
 #endif
 	for (int i = 0; i < 1000; ++i) old[i].tag = updated[i].tag = Tag(20, 12);
 	Check(old, updated, 1000);
@@ -226,12 +226,12 @@ static void GroupSnapshotJoinSplitAndEmptyReuse(b2ParticleProxySortMode mode)
 
 TEST(ParticleProxySort, ContactEquivalenceAndLifecycle)
 {
-	for (int mode = b2_adaptiveRowProxySort; mode <= b2_twoStreamProxySort; ++mode)
+	for (int mode = b2_pairMergeProxySort; mode <= b2_twoStreamProxySort; ++mode)
 		ContactEquivalenceAndLifecycle((b2ParticleProxySortMode)mode);
 }
 TEST(ParticleProxySort, GroupSnapshotJoinSplitAndEmptyReuse)
 {
-	for (int mode = b2_adaptiveRowProxySort; mode <= b2_twoStreamProxySort; ++mode)
+	for (int mode = b2_pairMergeProxySort; mode <= b2_twoStreamProxySort; ++mode)
 		GroupSnapshotJoinSplitAndEmptyReuse((b2ParticleProxySortMode)mode);
 }
 
@@ -244,7 +244,7 @@ TEST(ParticleProxySort, OverflowSwapDumpAndModeSwitch)
 	const int xs[7] = {20, 10, 0, 30, 40, 60, 15};
 	for (int pass = 0; pass < 4; ++pass)
 	{
-		b2ParticleProxySortMode mode = pass % 2 ? b2_overflowProxySort : b2_insertionProxySort;
+		b2ParticleProxySortMode mode = pass % 2 ? b2_pairMergeProxySort : b2_twoStreamProxySort;
 		profile.Reset();
 		TestProxy* updated = sorter.Prepare(7, profile, mode);
 		for (int i = 0; i < 7; ++i)
@@ -262,13 +262,8 @@ TEST(ParticleProxySort, OverflowSwapDumpAndModeSwitch)
 		}
 		EXPECT_EQ(7u, indices.size());
 #if defined(BOX2D_PROFILE_PARTICLES) && !defined(BOX2D_PROFILE_PARTICLE_PROXY_ONLY)
-		if (mode == b2_overflowProxySort)
-		{
-			EXPECT_EQ(3u, profile.overflowParticles);
-			EXPECT_EQ(1u, profile.localSwaps);
-			EXPECT_EQ(0u, profile.multiRow);
-			EXPECT_EQ(0u, profile.repairBudget);
-		}
+		EXPECT_EQ(3u, profile.overflowParticles);
+		EXPECT_EQ(1u, profile.localSwaps);
 		if (pass >= 2) EXPECT_EQ(0u, profile.growths);
 #endif
 	}
@@ -290,7 +285,7 @@ TEST(ParticleProxySort, LightProfiling)
 		EXPECT_EQ(0, s->GetParticleProfile().tagMs);
 		EXPECT_EQ(0, s->GetParticleProfile().orderMs);
 		EXPECT_EQ(0, s->GetParticleProfile().solveMs);
-		EXPECT_EQ(0u, s->GetParticleProfile().comparisons);
+		EXPECT_EQ(0u, s->GetParticleProfile().localSwaps);
 		EXPECT_EQ(0u, s->GetParticleProfile().updates);
 	}
 #endif

@@ -666,12 +666,8 @@ int main(int argc, char** argv)
 	glui->add_checkbox("Strict Particle/Body Contacts", &settings.strictContacts);
 	glui->add_checkbox("Adaptive Particle Sort", &settings.adaptiveParticleSort);
 	GLUI_Listbox* sorterList = glui->add_listbox("Variant", &settings.particleSortVariant);
-	sorterList->add_item(b2_adaptiveRowProxySort, "Original adaptive");
-	sorterList->add_item(b2_insertionProxySort, "Insert while classifying");
-	sorterList->add_item(b2_overflowProxySort, "Overflow + one swap");
-	sorterList->add_item(b2_scanMergeProxySort, "Overflow: direct merge");
-	sorterList->add_item(b2_pairMergeProxySort, "Overflow: pairwise merge");
 	sorterList->add_item(b2_twoStreamProxySort, "All movers to overflow");
+	sorterList->add_item(b2_pairMergeProxySort, "Separate movers + merge");
 
 	//glui->add_separator();
 

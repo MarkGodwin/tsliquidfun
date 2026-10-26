@@ -156,7 +156,7 @@ struct b2ParticleSystemDef
 	b2ParticleSystemDef()
 	{
 #ifdef BOX2D_TEST_ADAPTIVE_DEFAULT
-		proxySortMode = b2_adaptiveRowProxySort;
+		proxySortMode = b2_twoStreamProxySort;
 #else
 		proxySortMode = b2_referenceProxySort;
 #endif

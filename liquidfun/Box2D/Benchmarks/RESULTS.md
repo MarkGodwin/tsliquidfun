@@ -1,5 +1,9 @@
 # Initial desktop validation — 26 October 2026
 
+These are historical experiments preserved in checkpoint `d4422fda`. The current
+code retains only `reference`, `pair`, and `two-stream`; see `README.md` for
+current commands. Earlier raw CSV schemas and experiment names are unchanged.
+
 ## Follow-up: insertion and overflow experiments
 
 Both variants are retained alongside the original adaptive implementation.

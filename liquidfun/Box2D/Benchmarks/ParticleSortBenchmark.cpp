@@ -65,7 +65,7 @@ static Options Parse(int argc, char** argv)
 		std::string key(argv[i]);
 		if (key == "--help")
 		{
-			std::cout << "ParticleSortBenchmark --mode world|replay --sorter reference|adaptive|insertion|overflow|scan|pair|two-stream "
+			std::cout << "ParticleSortBenchmark --mode world|replay --sorter reference|pair|two-stream "
 				"--scene settled|falling|shear|separated|churn|teleport --count N --iterations N "
 				"--warmup N --steps N --seed N --output PREFIX --trace-frames N "
 				"[--trace-in FILE] [--trace-out FILE]\n"; std::exit(0);
@@ -86,7 +86,7 @@ static Options Parse(int argc, char** argv)
 		else if (key == "--trace-frames") o.traceFrames = Number(value);
 		else throw std::runtime_error("Unknown option: " + key);
 	}
-	if (o.sorter != "reference" && o.sorter != "adaptive" && o.sorter != "insertion" && o.sorter != "overflow" && o.sorter != "scan" && o.sorter != "pair" && o.sorter != "two-stream") throw std::runtime_error("Invalid sorter");
+	if (o.sorter != "reference" && o.sorter != "pair" && o.sorter != "two-stream") throw std::runtime_error("Invalid sorter");
 	if (o.mode != "world" && o.mode != "replay") throw std::runtime_error("Invalid mode");
 	if (!o.traceIn.empty() && o.mode != "replay") throw std::runtime_error("--trace-in requires replay mode");
 	if (!o.count || o.count > 30000 || !o.steps || !o.iterations || !o.traceFrames || o.traceFrames > 1000)
@@ -141,7 +141,10 @@ static std::vector<Frame> LoadTrace(const std::string& path)
 }
 
 static b2ParticleProxySortMode SortMode(const Options& o)
-{ return o.sorter == "scan" ? b2_scanMergeProxySort : o.sorter == "pair" ? b2_pairMergeProxySort : o.sorter == "two-stream" ? b2_twoStreamProxySort : o.sorter == "reference" ? b2_referenceProxySort : o.sorter == "overflow" ? b2_overflowProxySort : o.sorter == "insertion" ? b2_insertionProxySort : b2_adaptiveRowProxySort; }
+{
+	return o.sorter == "reference" ? b2_referenceProxySort :
+		o.sorter == "pair" ? b2_pairMergeProxySort : b2_twoStreamProxySort;
+}
 
 static uint32 Random(uint32& state) { state = state * 1664525u + 1013904223u; return state; }
 class Scene
@@ -224,7 +227,7 @@ static void Report(const Options& o, const std::vector<Sample>& samples)
 {
 	std::ofstream csv((o.output + ".steps.csv").c_str());
 	if (!csv) throw std::runtime_error("Cannot write output prefix: " + o.output);
-	csv << "step,ms,count,solve_ms,proxy_ms,tag_ms,order_ms,reference_sort_ms,contacts_ms,filter_listener_ms,body_contacts_ms,collision_ms,remaining_solver_ms,updates,substeps,rows,north,south,residents,newborn,comparisons,shifts,adaptive,invalid_history,unordered_history,multi_row,repair_budget,candidates,contacts,body_contacts,growths,scratch_bytes,max_row_displacement,overflow_particles,local_swaps,processed_proxies\n";
+	csv << "step,ms,count,solve_ms,proxy_ms,tag_ms,order_ms,reference_sort_ms,contacts_ms,filter_listener_ms,body_contacts_ms,collision_ms,remaining_solver_ms,updates,substeps,north,south,residents,newborn,adaptive,candidates,contacts,body_contacts,growths,scratch_bytes,max_row_displacement,overflow_particles,local_swaps,processed_proxies\n";
 	std::vector<double> times; b2Stat stats; int missed = 0;
 	for (size_t i = 0; i < samples.size(); ++i)
 	{
@@ -234,9 +237,8 @@ static void Report(const Options& o, const std::vector<Sample>& samples)
 			<< p.solveMs << ',' << p.proxyMs << ',' << p.tagMs << ',' << p.orderMs << ',' << p.referenceSortMs << ','
 			<< p.contactsMs << ',' << p.filterListenerMs << ',' << p.bodyContactsMs << ',' << p.collisionMs << ','
 			<< (p.solveMs - p.proxyMs - p.contactsMs - p.filterListenerMs - p.bodyContactsMs - p.collisionMs) << ','
-			<< p.updates << ',' << p.substeps << ',' << p.rows << ',' << p.north << ',' << p.south << ',' << p.residents << ',' << p.newborn << ','
-			<< p.comparisons << ',' << p.shifts << ',' << p.adaptiveUpdates << ',' << p.invalidHistory << ',' << p.unorderedHistory << ','
-			<< p.multiRow << ',' << p.repairBudget << ',' << p.candidates << ',' << p.contacts << ',' << p.bodyContacts << ','
+			<< p.updates << ',' << p.substeps << ',' << p.north << ',' << p.south << ',' << p.residents << ',' << p.newborn << ','
+			<< p.adaptiveUpdates << ',' << p.candidates << ',' << p.contacts << ',' << p.bodyContacts << ','
 			<< p.growths << ',' << p.scratchBytes << ',' << p.maxRowDisplacement << ',' << p.overflowParticles << ',' << p.localSwaps << ',' << p.particles << '\n';
 	}
 	std::sort(times.begin(), times.end());
@@ -269,7 +271,6 @@ static void Report(const Options& o, const std::vector<Sample>& samples)
 #else
 	meta << 32;
 #endif
-	meta << "\nshift_budget_per_particle=8";
 	if (o.traceIn.empty()) meta << "\nradius=0.05\nflags=water\ndt=1/60\nvelocity_iterations=8\nposition_iterations=3";
 	else meta << "\ncapture_parameters=unknown (external trace)";
 	meta << "\nwarmup=" << o.warmup

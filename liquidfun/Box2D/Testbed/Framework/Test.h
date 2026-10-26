@@ -78,7 +78,7 @@ struct Settings
 		drawProfile = 0;
 		drawParticleProfile = 1;
 		adaptiveParticleSort = 0;
-		particleSortVariant = b2_adaptiveRowProxySort;
+		particleSortVariant = b2_twoStreamProxySort;
 		enableWarmStarting = 1;
 		enableContinuous = 1;
 		enableSubStepping = 0;

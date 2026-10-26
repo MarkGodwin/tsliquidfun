@@ -402,7 +402,7 @@ void Test::Step(Settings* settings)
 	if (settings->drawParticleProfile)
 	{
 		bool holdSample = timeStep == 0 && m_particleFrameSorter == sortMode;
-		const char* sortNames[] = {"reference", "original adaptive", "insertion", "overflow", "direct merge", "pairwise merge", "two streams"};
+		const char* sortNames[] = {"reference", "movers + merge", "all movers to overflow"};
 		m_debugDraw.DrawString(5, m_textLine, "Particle sort: %s | physics frame %.3f ms%s",
 			sortNames[sortMode],
 			timeStep > 0 ? settings->stepTimeOut : (holdSample ? m_particleFrameMs : 0),
@@ -421,8 +421,6 @@ void Test::Step(Settings* settings)
 			total.contactsMs += p.contactsMs; total.bodyContactsMs += p.bodyContactsMs;
 			total.filterListenerMs += p.filterListenerMs; total.collisionMs += p.collisionMs;
 			total.updates += p.updates; total.adaptiveUpdates += p.adaptiveUpdates;
-			total.invalidHistory += p.invalidHistory; total.unorderedHistory += p.unorderedHistory;
-			total.multiRow += p.multiRow; total.repairBudget += p.repairBudget;
 			total.overflowParticles += p.overflowParticles; total.particles += p.particles;
 		}
 		if (holdSample)
@@ -444,7 +442,7 @@ void Test::Step(Settings* settings)
 		m_debugDraw.DrawString(5, m_textLine, "Per frame, all systems/substeps: %d particles | particles %.3f ms",
 			particles, total.solveMs);
 		m_textLine += DRAW_STRING_NEW_LINE;
-		m_debugDraw.DrawString(5, m_textLine, "Proxy %.3f ms: tags %.3f + order %.3f (includes fallback)",
+		m_debugDraw.DrawString(5, m_textLine, "Proxy %.3f ms: tags %.3f + order %.3f (includes overflow sort)",
 			total.proxyMs, total.tagMs, total.orderMs);
 		m_textLine += DRAW_STRING_NEW_LINE;
 		m_debugDraw.DrawString(5, m_textLine, "Particle contacts %.3f | body contacts %.3f ms",
@@ -454,17 +452,11 @@ void Test::Step(Settings* settings)
 			total.collisionMs, total.filterListenerMs,
 			total.solveMs - total.proxyMs - total.contactsMs - total.bodyContactsMs - total.collisionMs - total.filterListenerMs);
 		m_textLine += DRAW_STRING_NEW_LINE;
-		m_debugDraw.DrawString(5, m_textLine, "Updates %.0f | adaptive %.0f | fallback: history %.0f, jump %.0f, budget %.0f",
+		m_debugDraw.DrawString(5, m_textLine, "Updates %.0f | adaptive %.0f | overflow %.0f / %.0f proxies (%.1f%%)",
 			(double)total.updates, (double)total.adaptiveUpdates,
-			(double)(total.invalidHistory + total.unorderedHistory), (double)total.multiRow, (double)total.repairBudget);
+			(double)total.overflowParticles, (double)total.particles,
+			total.particles ? 100.0 * total.overflowParticles / total.particles : 0);
 		m_textLine += DRAW_STRING_NEW_LINE;
-		if (sortMode >= b2_overflowProxySort)
-		{
-			m_debugDraw.DrawString(5, m_textLine, "Overflow (including newborns): %.0f / %.0f proxies (%.1f%%)",
-				(double)total.overflowParticles, (double)total.particles,
-				total.particles ? 100.0 * total.overflowParticles / total.particles : 0);
-			m_textLine += DRAW_STRING_NEW_LINE;
-		}
 #endif
 #else
 		m_debugDraw.DrawString(5, m_textLine, "Detailed timings disabled: build with BOX2D_PROFILE_PARTICLES=ON");

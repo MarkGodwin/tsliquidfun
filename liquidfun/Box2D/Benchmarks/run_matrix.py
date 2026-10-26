@@ -41,8 +41,8 @@ def main():
     parser.add_argument("--steps", type=int, default=3000)
     parser.add_argument("--warmup", type=int, default=300)
     parser.add_argument("--mode", choices=["world", "replay"], default="world")
-    parser.add_argument("--candidate", choices=["adaptive", "insertion", "overflow", "scan", "pair", "two-stream"], default="adaptive")
-    parser.add_argument("--baseline", choices=["reference", "overflow"], default="reference")
+    parser.add_argument("--candidate", choices=["pair", "two-stream"], default="two-stream")
+    parser.add_argument("--baseline", choices=["reference", "pair", "two-stream"], default="reference")
     args = parser.parse_args()
     if args.runs < 1 or args.steps < 1 or args.warmup < 0:
         parser.error("runs and steps must be positive; warmup must be nonnegative")
@@ -70,10 +70,6 @@ def main():
                             samples = list(csv.DictReader(stream))
                         for metric in ("proxy_ms", "order_ms", "contacts_ms"):
                             row[f"median_{metric}"] = statistics.median(float(s[metric]) for s in samples)
-                        updates = sum(int(s["updates"]) for s in samples)
-                        fallbacks = sum(int(s[k]) for s in samples for k in
-                                        ("invalid_history", "unordered_history", "multi_row", "repair_budget"))
-                        row["fallback_fraction"] = fallbacks / updates if updates else 0
                         processed = sum(int(s["processed_proxies"]) for s in samples)
                         row["overflow_fraction"] = sum(int(s["overflow_particles"]) for s in samples) / processed if processed else 0
                         row["max_scratch_bytes"] = max(int(s["scratch_bytes"]) for s in samples)
@@ -91,14 +87,14 @@ def main():
                             and int(r["iterations"]) == iterations]
                 comparison = {"mode": args.mode, "scene": scene, "count": count, "iterations": iterations, "candidate": args.candidate, "baseline": args.baseline}
                 for metric in ("median_ms", "p95_ms", "median_proxy_ms", "median_order_ms", "median_contacts_ms"):
-                    reference = [float(r[metric]) for r in matching if r["sorter"] == args.baseline]
-                    adaptive = [float(r[metric]) for r in matching if r["sorter"] == args.candidate]
-                    base, result = statistics.median(reference), statistics.median(adaptive)
-                    comparison[f"reference_{metric}"] = base
-                    comparison[f"adaptive_{metric}"] = result
+                    baseline = [float(r[metric]) for r in matching if r["sorter"] == args.baseline]
+                    candidate = [float(r[metric]) for r in matching if r["sorter"] == args.candidate]
+                    base, result = statistics.median(baseline), statistics.median(candidate)
+                    comparison[f"baseline_{metric}"] = base
+                    comparison[f"candidate_{metric}"] = result
                     comparison[f"improvement_percent_{metric}"] = 100 * (base - result) / base if base else 0
-                    comparison[f"reference_range_{metric}"] = max(reference) - min(reference)
-                    comparison[f"adaptive_range_{metric}"] = max(adaptive) - min(adaptive)
+                    comparison[f"baseline_range_{metric}"] = max(baseline) - min(baseline)
+                    comparison[f"candidate_range_{metric}"] = max(candidate) - min(candidate)
                 comparisons.append(comparison)
     with (args.output / "comparisons.csv").open("w", newline="") as stream:
         writer = csv.DictWriter(stream, fieldnames=comparisons[0].keys())
