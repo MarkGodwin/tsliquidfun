@@ -1672,6 +1672,69 @@ TEST_F(FunctionTests, AreProxyBuffersTheSame) {
 	EXPECT_FALSE(b2ParticleSystem::AreProxyBuffersTheSame(a, b));
 }
 
+TEST_F(FunctionTests, RemoveParticleConnectionsPreservesOtherBondsAndParticles)
+{
+	b2PolygonShape shape;
+	shape.SetAsBox(.05f, .05f);
+	b2ParticleGroupDef def;
+	def.shape = &shape;
+	def.flags = b2_springParticle | b2_elasticParticle;
+	b2ParticleGroup* group = m_particleSystem->CreateParticleGroup(def);
+	const int32 count = m_particleSystem->GetParticleCount();
+	ASSERT_GT(m_particleSystem->GetPairCount(), 0);
+	ASSERT_GT(m_particleSystem->GetTriadCount(), 0);
+	for (int32 index = 0; index < count; ++index)
+	{
+		std::vector<b2ParticlePair> pairs;
+		std::vector<b2ParticleTriad> triads;
+		for (int32 i = 0; i < m_particleSystem->GetPairCount(); ++i)
+		{
+			const b2ParticlePair& pair = m_particleSystem->GetPairs()[i];
+			if (pair.indexA != index && pair.indexB != index) pairs.push_back(pair);
+		}
+		for (int32 i = 0; i < m_particleSystem->GetTriadCount(); ++i)
+		{
+			const b2ParticleTriad& triad = m_particleSystem->GetTriads()[i];
+			if (triad.indexA != index && triad.indexB != index && triad.indexC != index) triads.push_back(triad);
+		}
+		const b2Vec2 position = m_particleSystem->GetPositionBuffer()[index];
+		m_particleSystem->RemoveParticleConnections(index);
+		ASSERT_EQ(pairs.size(), (size_t)m_particleSystem->GetPairCount());
+		ASSERT_EQ(triads.size(), (size_t)m_particleSystem->GetTriadCount());
+		for (size_t i = 0; i < pairs.size(); ++i)
+		{
+			EXPECT_EQ(pairs[i].indexA, m_particleSystem->GetPairs()[i].indexA);
+			EXPECT_EQ(pairs[i].indexB, m_particleSystem->GetPairs()[i].indexB);
+			EXPECT_EQ(pairs[i].distance, m_particleSystem->GetPairs()[i].distance);
+		}
+		for (size_t i = 0; i < triads.size(); ++i)
+		{
+			EXPECT_EQ(triads[i].indexA, m_particleSystem->GetTriads()[i].indexA);
+			EXPECT_EQ(triads[i].indexB, m_particleSystem->GetTriads()[i].indexB);
+			EXPECT_EQ(triads[i].indexC, m_particleSystem->GetTriads()[i].indexC);
+		}
+		EXPECT_EQ(count, m_particleSystem->GetParticleCount());
+		EXPECT_EQ(count, group->GetParticleCount());
+		EXPECT_EQ(group, m_particleSystem->GetGroupBuffer()[index]);
+		EXPECT_EQ(def.flags, m_particleSystem->GetParticleFlags(index));
+		EXPECT_EQ(position.x, m_particleSystem->GetPositionBuffer()[index].x);
+		EXPECT_EQ(position.y, m_particleSystem->GetPositionBuffer()[index].y);
+	}
+	EXPECT_EQ(0, m_particleSystem->GetPairCount());
+	EXPECT_EQ(0, m_particleSystem->GetTriadCount());
+}
+
+TEST_F(FunctionTests, RemoveParticleConnectionsWithNoBondsIsIdempotent)
+{
+	b2ParticleDef def;
+	const int32 index = m_particleSystem->CreateParticle(def);
+	m_particleSystem->RemoveParticleConnections(index);
+	m_particleSystem->RemoveParticleConnections(index);
+	EXPECT_EQ(1, m_particleSystem->GetParticleCount());
+	EXPECT_EQ(0, m_particleSystem->GetPairCount());
+	EXPECT_EQ(0, m_particleSystem->GetTriadCount());
+}
+
 int main(int argc, char **argv)
 {
 	::testing::InitGoogleTest(&argc, argv);

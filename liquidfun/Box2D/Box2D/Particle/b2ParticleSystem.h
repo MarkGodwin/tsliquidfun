@@ -155,11 +155,7 @@ struct b2ParticleSystemDef
 {
 	b2ParticleSystemDef()
 	{
-#ifdef BOX2D_TEST_ADAPTIVE_DEFAULT
 		proxySortMode = b2_twoStreamProxySort;
-#else
-		proxySortMode = b2_referenceProxySort;
-#endif
 		strictContactCheck = false;
 		density = 1.0f;
 		gravityScale = 1.0f;
@@ -189,7 +185,7 @@ struct b2ParticleSystemDef
 	/// Enable strict Particle/Body contact check.
 	/// See SetStrictContactCheck for details.
 	bool strictContactCheck;
-	/// Experimental proxy ordering; reference sorting is the production default.
+	/// Proxy ordering; two-stream sorting is the default.
 	b2ParticleProxySortMode proxySortMode;
 
 	/// Set the particle density.
@@ -517,6 +513,11 @@ public:
 
 	/// Set flags for a particle. See the b2ParticleFlag enum.
 	void SetParticleFlags(int32 index, uint32 flags);
+	/// Remove current spring/barrier pairs and elastic triads referencing a
+	/// particle, preserving the particle, its flags and group membership.
+	/// Connections may be recreated when group connections are rebuilt.
+	/// The world must be unlocked and index must identify a live particle.
+	void RemoveParticleConnections(int32 index);
 	/// Get flags for a particle. See the b2ParticleFlag enum.
 	uint32 GetParticleFlags(const int32 index);
 

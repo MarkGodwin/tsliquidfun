@@ -1,7 +1,7 @@
 # Particle proxy sorting
 
-The production default remains `b2_referenceProxySort` (`std::sort`). Two
-experimental implementations are retained:
+The production default is `b2_twoStreamProxySort`. The reference `std::sort`
+remains selectable as `b2_referenceProxySort`. Two adaptive implementations are retained:
 
 | API mode | Benchmark name | Testbed variant |
 |---|---|---|
@@ -61,9 +61,9 @@ including randomized order/membership, newborns, jumps, disorder, contact
 equivalence, group lifecycle and mode-switch buffer reuse.
 
 `BOX2D_VALIDATE_PARTICLE_PROXY_SORT` shadow-checks exact proxy membership and
-ordering. Disable it for performance measurements. The test-only option
-`BOX2D_TEST_ADAPTIVE_DEFAULT=ON` selects two-stream in existing test scenes;
-leave it OFF for production and performance builds.
+ordering. Disable it for performance measurements. Existing test scenes use the
+production two-stream default; the old `BOX2D_TEST_ADAPTIVE_DEFAULT` option has
+been removed.
 
 ## Testbed and profiling
 
@@ -88,7 +88,7 @@ Choose profiling at build time:
 For example on Windows:
 
 ```powershell
-cmake -S liquidfun/Box2D -B build-adaptive-clean-testbed -DBOX2D_BUILD_EXAMPLES=ON -DBOX2D_BUILD_UNITTESTS=OFF -DBOX2D_PROFILE_PARTICLE_PROXY_ONLY=ON -DBOX2D_VALIDATE_PARTICLE_PROXY_SORT=OFF -DBOX2D_TEST_ADAPTIVE_DEFAULT=OFF
+cmake -S liquidfun/Box2D -B build-adaptive-clean-testbed -DBOX2D_BUILD_EXAMPLES=ON -DBOX2D_BUILD_UNITTESTS=OFF -DBOX2D_PROFILE_PARTICLE_PROXY_ONLY=ON -DBOX2D_VALIDATE_PARTICLE_PROXY_SORT=OFF
 cmake --build build-adaptive-clean-testbed --config Release --target Testbed -- /m:1 /nr:false
 .\build-adaptive-clean-testbed\Testbed\Release\Testbed.exe
 ```

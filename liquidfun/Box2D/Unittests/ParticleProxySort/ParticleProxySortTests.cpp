@@ -64,6 +64,17 @@ TEST(ParticleProxySort, EmptySingletonAndNewbornRows)
 	Check(old, updated, 0, false);
 }
 
+TEST(ParticleProxySort, DefaultSystemUsesTwoStreamSort)
+{
+	b2ParticleSystemDef def;
+	EXPECT_EQ(b2_twoStreamProxySort, def.proxySortMode);
+	b2World world(b2Vec2(0, 0));
+	b2ParticleSystem* system = world.CreateParticleSystem(&def);
+	EXPECT_EQ(b2_twoStreamProxySort, system->GetProxySortMode());
+	system->SetProxySortMode(b2_referenceProxySort);
+	EXPECT_EQ(b2_referenceProxySort, system->GetProxySortMode());
+}
+
 TEST(ParticleProxySort, RandomizedRowsMoversBirthsAndJumps)
 {
 	uint32 seed = 12345;

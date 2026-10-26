@@ -4814,6 +4814,33 @@ void b2ParticleSystem::SetUserDataBuffer(void** buffer, int32 capacity)
 	SetUserOverridableBuffer(&m_userDataBuffer, buffer, capacity);
 }
 
+class b2ParticleConnectionRemovePredicate
+{
+public:
+	explicit b2ParticleConnectionRemovePredicate(int32 index) : m_index(index) {}
+	bool operator()(const b2ParticlePair& pair) const
+	{
+		return pair.indexA == m_index || pair.indexB == m_index;
+	}
+	bool operator()(const b2ParticleTriad& triad) const
+	{
+		return triad.indexA == m_index || triad.indexB == m_index || triad.indexC == m_index;
+	}
+private:
+	int32 m_index;
+};
+
+void b2ParticleSystem::RemoveParticleConnections(int32 index)
+{
+	b2Assert(!m_world->IsLocked());
+	if (m_world->IsLocked()) return;
+	b2Assert(index >= 0 && index < m_count);
+	if (index < 0 || index >= m_count) return;
+	const b2ParticleConnectionRemovePredicate predicate(index);
+	if (m_pairBuffer.GetCount()) m_pairBuffer.RemoveIf(predicate);
+	if (m_triadBuffer.GetCount()) m_triadBuffer.RemoveIf(predicate);
+}
+
 void b2ParticleSystem::SetParticleFlags(int32 index, uint32 newFlags)
 {
 	uint32* oldFlags = &m_flagsBuffer.data[index];
