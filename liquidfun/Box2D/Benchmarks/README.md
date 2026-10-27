@@ -4,7 +4,8 @@ The engine has one proxy layout: `Proxy` contains particle index, spatial tag
 and cached position (16 bytes). The concrete
 `b2ParticleProxySorter` uses `b2ParticleProxyKey` records with only index and tag
 (8 bytes). Classification computes each new tag from the current position and
-routes the key immediately into resident or overflow scratch. There is no
+routes the key immediately into shared scratch: residents grow forwards
+from the front and overflow grows backwards from the end. There is no
 pre-populated updated-key array and no second classification traversal of it.
 Overflow sorting moves only keys; final merge gathers current positions into
 the proxy array.
@@ -24,8 +25,12 @@ Sort history preserves the ordered prefix while appending newborns. One
 adjacent swap repairs isolated inversions; larger inversions and Y-band movers
 enter overflow. Invalid history sends everything through overflow sorting.
 Radius changes invalidate history; deletion preserves the surviving prefix.
-Resident and overflow scratch capacity is 16 bytes per slot (two 8-byte key buffers), grows
-geometrically and is reused without allocation after warming up.
+Scratch capacity is 8 bytes per slot (one shared key buffer), grows
+geometrically and is reused without allocation after warming up. Overflow
+insertion reverses its input order; equal-tag order can differ from the
+previous implementation, but repeats consistently for identical replay input
+within the same build. Cross-platform equal-tag order is not guaranteed by
+`std::sort`.
 
 ## Build and test
 
@@ -101,7 +106,8 @@ for compact-key replay and historical comparisons. Their concrete implementation
 is in `Benchmarks/ParticleProxyReplaySort.h`, outside the engine sorter. Replay
 continues to accept precomputed tags, so it does not measure fused production
 classification. Sorter tests compare the production pass with the historical
-two-stream result using positions that round-trip exact tags. Replay
+two-stream tags and membership using positions that round-trip exact tags,
+and check exact repeatability across cold and reused scratch buffers. Replay
 excludes tag calculation, final position emission, setup/copying, I/O and exact
 output verification from its timing. It cannot measure cached contact access.
 

@@ -144,3 +144,23 @@ The fused Testbed overlay was visually checked; evidence is saved as
 `benchmark-results/fused-classify/testbed.png`. Historical trace replay also
 passes. JavaScript and iOS source registrations were updated, but those
 targets were not built because their toolchains are unavailable here.
+
+## Shared scratch follow-up
+
+Residents and overflow now share one key buffer. Residents grow forwards,
+overflow grows backwards, and the ranges meet after classification. Only the
+overflow suffix is sorted before merging into the proxy output. Scratch storage
+is now 8 bytes per capacity slot rather than 16; growth remains geometric.
+
+Overflow insertion reverses its input order. Equal-tag order may differ from
+the previous sorter, so cross-version final-state hashes are no longer an
+acceptance criterion. Randomized regression checks sorted tags, complete key
+membership, cached positions and exact repeatability with cold and reused
+scratch; equal-tag cases cover all-resident, mixed, all-newborn and invalid
+history inputs. Same-build repeat runs of all six world scenes (1000 particles,
+two iterations, 50 warmup and 150 measured steps) produced identical final
+position/velocity/flag hashes. These are correctness checks, not performance
+measurements. Cross-platform tie ordering is not guaranteed by std::sort.
+
+The earlier old/new comparison executables are preserved. The shared-buffer
+Testbed is built separately at benchmark-results/shared-proxy-scratch/Testbed.exe.

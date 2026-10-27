@@ -92,6 +92,7 @@ private:
 	void Classify(const b2ParticleProxy* proxies, int32 count, int32 prefix, bool valid,
 		const b2Vec2* positions, float32 inverseDiameter, b2ParticleSystemProfile& profile);
 	void Merge(b2ParticleProxy* output, const b2Vec2* positions) const;
-	b2GrowableBuffer<b2ParticleProxyKey> m_residents, m_overflow;
+	b2GrowableBuffer<b2ParticleProxyKey> m_keys;
+	int32 m_residentCount;
 };
 #endif
