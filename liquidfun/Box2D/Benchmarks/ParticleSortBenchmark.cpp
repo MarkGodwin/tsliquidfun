@@ -1,8 +1,10 @@
 // Headless native benchmark for this LiquidFun fork (zlib license).
 #include <Box2D/Box2D.h>
+#include "ParticleProxyReplaySort.h"
 #include <Box2D/Common/b2Stat.h>
 #include <algorithm>
 #include <cmath>
+#include <cstring>
 #include <cstdlib>
 #include <fstream>
 #include <iomanip>
@@ -12,11 +14,7 @@
 #include <string>
 #include <vector>
 
-struct Proxy
-{
-	int32 index; uint32 tag;
-	bool operator<(const Proxy& o) const { return tag < o.tag; }
-};
+typedef b2ParticleProxyKey Proxy;
 static bool Canonical(const Proxy& a, const Proxy& b)
 { return a.tag < b.tag || (a.tag == b.tag && a.index < b.index); }
 struct Frame
@@ -46,9 +44,9 @@ public:
 
 struct Options
 {
-	std::string scene, sorter, mode, output, traceIn, traceOut;
+	std::string scene, sorter, mode, output, traceIn, traceOut, stateHash;
 	int count, iterations, warmup, steps, seed, traceFrames;
-	Options() : scene("settled"), sorter("reference"), mode("world"), output("particle-sort"),
+	Options() : scene("settled"), sorter(""), mode("world"), output("particle-sort"),
 		count(3000), iterations(1), warmup(300), steps(3000), seed(1), traceFrames(120) {}
 };
 static int Number(const std::string& s)
@@ -65,7 +63,7 @@ static Options Parse(int argc, char** argv)
 		std::string key(argv[i]);
 		if (key == "--help")
 		{
-			std::cout << "ParticleSortBenchmark --mode world|replay --sorter reference|adaptive "
+			std::cout << "ParticleSortBenchmark --mode world|replay --sorter reference|pair|two-stream|cached "
 				"--scene settled|falling|shear|separated|churn|teleport --count N --iterations N "
 				"--warmup N --steps N --seed N --output PREFIX --trace-frames N "
 				"[--trace-in FILE] [--trace-out FILE]\n"; std::exit(0);
@@ -86,8 +84,11 @@ static Options Parse(int argc, char** argv)
 		else if (key == "--trace-frames") o.traceFrames = Number(value);
 		else throw std::runtime_error("Unknown option: " + key);
 	}
-	if (o.sorter != "reference" && o.sorter != "adaptive") throw std::runtime_error("Invalid sorter");
+	if (o.sorter.empty()) o.sorter = o.mode == "world" ? "cached" : "two-stream";
+	if (o.sorter != "reference" && o.sorter != "pair" && o.sorter != "two-stream" && o.sorter != "cached") throw std::runtime_error("Invalid sorter");
 	if (o.mode != "world" && o.mode != "replay") throw std::runtime_error("Invalid mode");
+	if (o.mode == "world" && o.sorter != "cached") throw std::runtime_error("World mode always uses cached proxies; other sorter names are replay-only");
+	if (o.mode == "replay" && o.sorter == "cached") throw std::runtime_error("Cached positions require world mode; sort traces contain no positions");
 	if (!o.traceIn.empty() && o.mode != "replay") throw std::runtime_error("--trace-in requires replay mode");
 	if (!o.count || o.count > 30000 || !o.steps || !o.iterations || !o.traceFrames || o.traceFrames > 1000)
 		throw std::runtime_error("Require 1..30000 particles, positive steps/iterations and 1..1000 trace frames");
@@ -148,7 +149,7 @@ public:
 	b2ParticleSystem* system;
 	float32 width, height;
 	uint32 random;
-	Scene(const Options& o, bool reference) : world(b2Vec2(0, -9.8f)), random(o.seed)
+	Scene(const Options& o) : world(b2Vec2(0, -9.8f)), random(o.seed)
 	{
 		int columns = (int)std::ceil(std::sqrt((double)o.count));
 		width = columns * .075f + .4f; height = width + 2;
@@ -162,7 +163,6 @@ public:
 		shape.SetAsBox(.1f, height, b2Vec2(origin + width + .1f, height / 2), 0); walls->CreateFixture(&shape, 0);
 		}
 		b2ParticleSystemDef sd; sd.radius = .05f;
-		sd.proxySortMode = reference || o.sorter == "reference" ? b2_referenceProxySort : b2_adaptiveRowProxySort;
 		system = world.CreateParticleSystem(&sd);
 		b2ParticleGroup* groups[2] = {NULL, NULL};
 		if (o.scene == "separated")
@@ -210,6 +210,26 @@ public:
 	}
 };
 
+// Outside timing: compare full particle state across separately built sorters.
+static std::string StateHash(b2ParticleSystem* system)
+{
+	uint64 hash = 14695981039346656037ULL;
+	hash ^= (uint64)system->GetParticleCount(); hash *= 1099511628211ULL;
+	for (int i = 0; i < system->GetParticleCount(); ++i)
+	{
+		const b2Vec2& p = system->GetPositionBuffer()[i];
+		const b2Vec2& v = system->GetVelocityBuffer()[i];
+		const float32 values[] = {p.x, p.y, v.x, v.y};
+		for (int j = 0; j < 4; ++j)
+		{
+			uint32 bits; std::memcpy(&bits, &values[j], sizeof(bits));
+			hash ^= bits; hash *= 1099511628211ULL;
+		}
+		hash ^= system->GetFlagsBuffer()[i]; hash *= 1099511628211ULL;
+	}
+	std::ostringstream result; result << std::hex << hash; return result.str();
+}
+
 struct Sample
 {
 	double ms; int count;
@@ -221,19 +241,18 @@ static void Report(const Options& o, const std::vector<Sample>& samples)
 {
 	std::ofstream csv((o.output + ".steps.csv").c_str());
 	if (!csv) throw std::runtime_error("Cannot write output prefix: " + o.output);
-	csv << "step,ms,count,solve_ms,proxy_ms,tag_ms,order_ms,reference_sort_ms,contacts_ms,filter_listener_ms,body_contacts_ms,collision_ms,remaining_solver_ms,updates,substeps,rows,north,south,residents,newborn,comparisons,shifts,adaptive,invalid_history,unordered_history,multi_row,repair_budget,candidates,contacts,body_contacts,growths,scratch_bytes,max_row_displacement\n";
+	csv << "step,ms,count,solve_ms,proxy_ms,classify_ms,order_ms,reference_sort_ms,contacts_ms,filter_listener_ms,body_contacts_ms,collision_ms,remaining_solver_ms,updates,substeps,processed_proxies,north,south,residents,newborn,overflow_particles,local_swaps,adaptive,candidates,contacts,body_contacts,growths,scratch_bytes,max_row_displacement\n";
 	std::vector<double> times; b2Stat stats; int missed = 0;
 	for (size_t i = 0; i < samples.size(); ++i)
 	{
 		const Sample& s = samples[i]; const b2ParticleSystemProfile& p = s.profile;
 		times.push_back(s.ms); stats.Record((float32)s.ms); if (s.ms > 1000.0 / 60) ++missed;
 		csv << std::setprecision(9) << i << ',' << s.ms << ',' << s.count << ','
-			<< p.solveMs << ',' << p.proxyMs << ',' << p.tagMs << ',' << p.orderMs << ',' << p.referenceSortMs << ','
+			<< p.solveMs << ',' << p.proxyMs << ',' << p.classifyMs << ',' << p.orderMs << ',' << p.referenceSortMs << ','
 			<< p.contactsMs << ',' << p.filterListenerMs << ',' << p.bodyContactsMs << ',' << p.collisionMs << ','
 			<< (p.solveMs - p.proxyMs - p.contactsMs - p.filterListenerMs - p.bodyContactsMs - p.collisionMs) << ','
-			<< p.updates << ',' << p.substeps << ',' << p.rows << ',' << p.north << ',' << p.south << ',' << p.residents << ',' << p.newborn << ','
-			<< p.comparisons << ',' << p.shifts << ',' << p.adaptiveUpdates << ',' << p.invalidHistory << ',' << p.unorderedHistory << ','
-			<< p.multiRow << ',' << p.repairBudget << ',' << p.candidates << ',' << p.contacts << ',' << p.bodyContacts << ','
+			<< p.updates << ',' << p.substeps << ',' << p.particles << ',' << p.north << ',' << p.south << ',' << p.residents << ',' << p.newborn << ','
+			<< p.overflowParticles << ',' << p.localSwaps << ',' << p.adaptiveUpdates << ',' << p.candidates << ',' << p.contacts << ',' << p.bodyContacts << ','
 			<< p.growths << ',' << p.scratchBytes << ',' << p.maxRowDisplacement << '\n';
 	}
 	std::sort(times.begin(), times.end());
@@ -258,13 +277,14 @@ static void Report(const Options& o, const std::vector<Sample>& samples)
 #else
 	meta << "off";
 #endif
+	meta << "\nstate_hash=" << (o.stateHash.empty() ? "unavailable" : o.stateHash);
 	meta << "\nindex_bits=";
 #ifdef B2_USE_16_BIT_PARTICLE_INDICES
 	meta << 16;
 #else
 	meta << 32;
 #endif
-	meta << "\nshift_budget_per_particle=8";
+
 	if (o.traceIn.empty()) meta << "\nradius=0.05\nflags=water\ndt=1/60\nvelocity_iterations=8\nposition_iterations=3";
 	else meta << "\ncapture_parameters=unknown (external trace)";
 	meta << "\nwarmup=" << o.warmup
@@ -284,7 +304,7 @@ int main(int argc, char** argv)
 		if (!o.traceIn.empty()) frames = LoadTrace(o.traceIn);
 		if (o.mode == "world" || frames.empty())
 		{
-			Scene scene(o, o.mode == "replay");
+			Scene scene(o);
 			int measured = o.mode == "replay" ? o.traceFrames : o.steps;
 			for (int i = -o.warmup; i < measured; ++i)
 			{
@@ -299,21 +319,23 @@ int main(int argc, char** argv)
 					Sample s; s.ms = elapsed; s.count = scene.system->GetParticleCount(); s.profile = scene.system->GetParticleProfile(); samples.push_back(s);
 				}
 			}
+			if (o.mode == "world") o.stateHash = StateHash(scene.system);
 		}
 		if (!o.traceOut.empty()) SaveTrace(o.traceOut, frames);
 		if (o.mode == "replay")
 		{
-			b2BlockAllocator allocator; b2ParticleProxySorter<Proxy> sorter(allocator);
+			b2BlockAllocator allocator; b2ParticleProxyReplaySorter sorter(allocator);
 			for (int i = -o.warmup; i < o.steps; ++i)
 			{
 				const Frame& f = frames[(i + o.warmup) % frames.size()];
 				int n = (int)f.old.size(); Sample s; s.count = n;
-				std::vector<Proxy> output(o.sorter == "adaptive" ? f.old : f.updated);
-				Proxy* updated = sorter.Prepare(n, s.profile);
+				std::vector<Proxy> output(o.sorter != "reference" ? f.old : f.updated);
+				b2ParticleProxySortMode mode = o.sorter == "pair" ? b2_pairMergeProxySort : b2_twoStreamProxySort;
+				Proxy* updated = sorter.Prepare(n, s.profile, mode);
 				for (int j = 0; j < n; ++j) updated[j] = f.updated[j];
 				B2_PARTICLE_STAT(s.profile.updates = 1; s.profile.particles = n);
 				b2Timer timer;
-				if (o.sorter == "adaptive") sorter.Sort(n ? &output[0] : NULL, n, f.prefix, f.valid, s.profile);
+				if (o.sorter != "reference") sorter.Sort(n ? &output[0] : NULL, n, f.prefix, f.valid, s.profile, mode);
 				else std::sort(output.begin(), output.end());
 				s.ms = timer.GetMilliseconds();
 				if (o.sorter == "reference")

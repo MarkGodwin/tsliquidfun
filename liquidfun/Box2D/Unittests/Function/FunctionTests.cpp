@@ -1650,14 +1650,14 @@ TEST_F(FunctionTests, ParticleGroupDefSetPositionColor) {
 
 TEST_F(FunctionTests, AreProxyBuffersTheSame) {
 	b2BlockAllocator blockAllocator;
-	b2GrowableBuffer<b2ParticleSystem::Proxy> a(blockAllocator);
-	b2GrowableBuffer<b2ParticleSystem::Proxy> b(blockAllocator);
+	b2GrowableBuffer<b2ParticleSystem::ProxyKey> a(blockAllocator);
+	b2GrowableBuffer<b2ParticleSystem::ProxyKey> b(blockAllocator);
 
 	// Compare proxies with same tags, but indices in different orders.
 	static const int LEN_BUFFERS = 4;
 	for (int i = 0; i < LEN_BUFFERS; ++i)
 	{
-		b2ParticleSystem::Proxy proxy;
+		b2ParticleSystem::ProxyKey proxy;
 		proxy.tag = 3;
 		proxy.index = i;
 		a.Append() = proxy;

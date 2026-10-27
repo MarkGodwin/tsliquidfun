@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run alternating native sorter comparisons and collect target metadata."""
+"""Measure the cached engine or compare compact sorters in replay mode."""
 import argparse
 import csv
 import json
@@ -41,20 +41,30 @@ def main():
     parser.add_argument("--steps", type=int, default=3000)
     parser.add_argument("--warmup", type=int, default=300)
     parser.add_argument("--mode", choices=["world", "replay"], default="world")
-    parser.add_argument("--candidate", choices=["pair", "two-stream"], default="two-stream")
-    parser.add_argument("--baseline", choices=["reference", "pair", "two-stream"], default="reference")
+    parser.add_argument("--candidate", choices=["pair", "two-stream", "cached"], default=None)
+    parser.add_argument("--baseline", choices=["reference", "pair", "two-stream", "cached"], default=None)
     args = parser.parse_args()
     if args.runs < 1 or args.steps < 1 or args.warmup < 0:
         parser.error("runs and steps must be positive; warmup must be nonnegative")
-    if args.baseline == args.candidate:
-        parser.error("baseline and candidate must differ")
+    if args.mode == "world":
+        if any(value not in (None, "cached") for value in (args.baseline, args.candidate)):
+            parser.error("world mode has one cached-proxy implementation; sorter comparisons require replay")
+        sorters = ["cached"]
+    else:
+        args.baseline = args.baseline or "reference"
+        args.candidate = args.candidate or "two-stream"
+        if "cached" in (args.baseline, args.candidate):
+            parser.error("sort-only traces contain no positions")
+        if args.baseline == args.candidate:
+            parser.error("baseline and candidate must differ")
+        sorters = [args.baseline, args.candidate]
     args.output.mkdir(parents=True, exist_ok=True)
     records = []
     for scene in args.scenes:
         for count in args.counts:
             for iterations in args.iterations:
                 for run in range(args.runs):
-                    for sorter in ([args.baseline, args.candidate] if run % 2 == 0 else [args.candidate, args.baseline]):
+                    for sorter in (sorters if run % 2 == 0 else list(reversed(sorters))):
                         prefix = args.output / f"{args.mode}-{scene}-{count}-{iterations}-{run}-{sorter}"
                         command = [str(args.executable.resolve()), "--mode", args.mode,
                                    "--scene", scene, "--count", str(count), "--iterations", str(iterations),
@@ -73,17 +83,20 @@ def main():
                         processed = sum(int(s["processed_proxies"]) for s in samples)
                         row["overflow_fraction"] = sum(int(s["overflow_particles"]) for s in samples) / processed if processed else 0
                         row["max_scratch_bytes"] = max(int(s["scratch_bytes"]) for s in samples)
+                        row["requested_count"] = count
                         row["run"] = run
                         records.append(row)
     with (args.output / "matrix.csv").open("w", newline="") as stream:
         writer = csv.DictWriter(stream, fieldnames=records[0].keys())
         writer.writeheader()
         writer.writerows(records)
+    if args.mode == "world":
+        return
     comparisons = []
     for scene in args.scenes:
         for count in args.counts:
             for iterations in args.iterations:
-                matching = [r for r in records if r["scene"] == scene and int(r["count"]) == count
+                matching = [r for r in records if r["scene"] == scene and int(r["requested_count"]) == count
                             and int(r["iterations"]) == iterations]
                 comparison = {"mode": args.mode, "scene": scene, "count": count, "iterations": iterations, "candidate": args.candidate, "baseline": args.baseline}
                 for metric in ("median_ms", "p95_ms", "median_proxy_ms", "median_order_ms", "median_contacts_ms"):

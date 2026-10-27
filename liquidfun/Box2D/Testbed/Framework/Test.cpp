@@ -76,7 +76,6 @@ Test::Test()
 	m_stepCount = 0;
 	m_particleFrameMs = 0;
 	m_particleFrameCount = 0;
-	m_particleFrameSorter = -1;
 
 	m_mouseWorld = b2Vec2_zero;
 	m_mouseTracing = false;
@@ -378,15 +377,10 @@ void Test::Step(Settings* settings)
 
 	m_pointCount = 0;
 
-	b2ParticleProxySortMode sortMode = settings->adaptiveParticleSort ?
-		(b2ParticleProxySortMode)settings->particleSortVariant : b2_referenceProxySort;
-	// Apply to every system (including Multiple Particle Systems), before
-	// the world locks. Reset counters per call; the overlay separately holds
-	// the last measured step while paused.
+	// Reset counters per call; the overlay holds the last measured step while paused.
 	for (b2ParticleSystem* system = m_world->GetParticleSystemList(); system;
 		system = system->GetNext())
 	{
-		system->SetProxySortMode(sortMode);
 		system->ResetParticleProfile();
 	}
 
@@ -401,10 +395,8 @@ void Test::Step(Settings* settings)
 
 	if (settings->drawParticleProfile)
 	{
-		bool holdSample = timeStep == 0 && m_particleFrameSorter == sortMode;
-		const char* sortNames[] = {"reference", "movers + merge", "all movers to overflow"};
-		m_debugDraw.DrawString(5, m_textLine, "Particle sort: %s | physics frame %.3f ms%s",
-			sortNames[sortMode],
+		bool holdSample = timeStep == 0;
+		m_debugDraw.DrawString(5, m_textLine, "Particle proxies: cached positions | physics frame %.3f ms%s",
 			timeStep > 0 ? settings->stepTimeOut : (holdSample ? m_particleFrameMs : 0),
 			timeStep > 0 ? "" : " (last measured step; paused)");
 		m_textLine += DRAW_STRING_NEW_LINE;
@@ -417,7 +409,7 @@ void Test::Step(Settings* settings)
 			const b2ParticleSystemProfile& p = system->GetParticleProfile();
 			particles += system->GetParticleCount();
 			total.solveMs += p.solveMs; total.proxyMs += p.proxyMs;
-			total.tagMs += p.tagMs; total.orderMs += p.orderMs;
+			total.classifyMs += p.classifyMs; total.orderMs += p.orderMs;
 			total.contactsMs += p.contactsMs; total.bodyContactsMs += p.bodyContactsMs;
 			total.filterListenerMs += p.filterListenerMs; total.collisionMs += p.collisionMs;
 			total.updates += p.updates; total.adaptiveUpdates += p.adaptiveUpdates;
@@ -442,8 +434,8 @@ void Test::Step(Settings* settings)
 		m_debugDraw.DrawString(5, m_textLine, "Per frame, all systems/substeps: %d particles | particles %.3f ms",
 			particles, total.solveMs);
 		m_textLine += DRAW_STRING_NEW_LINE;
-		m_debugDraw.DrawString(5, m_textLine, "Proxy %.3f ms: tags %.3f + order %.3f (includes overflow sort)",
-			total.proxyMs, total.tagMs, total.orderMs);
+		m_debugDraw.DrawString(5, m_textLine, "Proxy %.3f ms: tags/classify %.3f + sort/merge %.3f",
+			total.proxyMs, total.classifyMs, total.orderMs);
 		m_textLine += DRAW_STRING_NEW_LINE;
 		m_debugDraw.DrawString(5, m_textLine, "Particle contacts %.3f | body contacts %.3f ms",
 			total.contactsMs, total.bodyContactsMs);
@@ -465,7 +457,6 @@ void Test::Step(Settings* settings)
 		if (!holdSample)
 		{
 			m_particleFrameMs = timeStep > 0 ? settings->stepTimeOut : 0;
-			m_particleFrameSorter = sortMode;
 		}
 #if defined(BOX2D_VALIDATE_PARTICLE_PROXY_SORT)
 		m_debugDraw.DrawString(5, m_textLine, "Shadow validation ON: timings include checking overhead");

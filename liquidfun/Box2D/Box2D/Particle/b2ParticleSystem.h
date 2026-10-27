@@ -155,7 +155,6 @@ struct b2ParticleSystemDef
 {
 	b2ParticleSystemDef()
 	{
-		proxySortMode = b2_twoStreamProxySort;
 		strictContactCheck = false;
 		density = 1.0f;
 		gravityScale = 1.0f;
@@ -185,8 +184,6 @@ struct b2ParticleSystemDef
 	/// Enable strict Particle/Body contact check.
 	/// See SetStrictContactCheck for details.
 	bool strictContactCheck;
-	/// Proxy ordering; two-stream sorting is the default.
-	b2ParticleProxySortMode proxySortMode;
 
 	/// Set the particle density.
 	/// See SetDensity for details.
@@ -413,9 +410,6 @@ public:
 	/// @param paused is true to pause, false to un-pause.
 	void SetPaused(bool paused);
 
-	/// Experimental sorter selection; cannot change while the world is locked.
-	void SetProxySortMode(b2ParticleProxySortMode mode);
-	b2ParticleProxySortMode GetProxySortMode() const { return m_def.proxySortMode; }
 	const b2ParticleSystemProfile& GetParticleProfile() const { return m_particleProfile; }
 	void ResetParticleProfile() { m_particleProfile.Reset(); }
 
@@ -793,24 +787,8 @@ private:
 		int32 userSuppliedCapacity;
 	};
 
-	/// Used for detecting particle contacts
-	struct Proxy
-	{
-		int32 index;
-		uint32 tag;
-		friend inline bool operator<(const Proxy &a, const Proxy &b)
-		{
-			return a.tag < b.tag;
-		}
-		friend inline bool operator<(uint32 a, const Proxy &b)
-		{
-			return a < b.tag;
-		}
-		friend inline bool operator<(const Proxy &a, uint32 b)
-		{
-			return a.tag < b;
-		}
-	};
+	typedef b2ParticleProxyKey ProxyKey;
+	typedef b2ParticleProxy Proxy;
 
 	/// Class for filtering pairs or triads.
 	class ConnectionFilter
@@ -841,7 +819,7 @@ private:
 		}
 	};
 
-	/// InsideBoundsEnumerator enumerates all particles inside the given bounds.
+	/// Enumerates the single proxy layout without runtime or virtual dispatch.
 	class InsideBoundsEnumerator
 	{
 	public:
@@ -961,12 +939,11 @@ private:
 
 	void ComputeDepth();
 
-	InsideBoundsEnumerator GetInsideBoundsEnumerator(const b2AABB& aabb) const;
-
 	void UpdateAllParticleFlags();
 	void UpdateAllGroupFlags();
-	void AddContact(int32 a, int32 b,
+	void AddContact(const Proxy& a, const Proxy& b,
 		b2GrowableBuffer<b2ParticleContact>& contacts) const;
+	InsideBoundsEnumerator GetInsideBoundsEnumerator(const b2AABB& aabb) const;
 	void FindContacts_Reference(
 		b2GrowableBuffer<b2ParticleContact>& contacts) const;
 	void ReorderForFindContact(FindContactInput* reordered,
@@ -982,19 +959,12 @@ private:
 		b2GrowableBuffer<b2ParticleContact>& contacts) const;
 	void FindContacts(
 		b2GrowableBuffer<b2ParticleContact>& contacts) const;
-	static void UpdateProxyTags(
-		const uint32* const tags,
-		b2GrowableBuffer<Proxy>& proxies);
 	static bool ProxyBufferHasIndex(
-		int32 index, const Proxy* const a, int count);
+		int32 index, const ProxyKey* const a, int count);
 	static int NumProxiesWithSameTag(
-		const Proxy* const a, const Proxy* const b, int count);
-	static bool AreProxyBuffersTheSame(const b2GrowableBuffer<Proxy>& a,
-								   	   const b2GrowableBuffer<Proxy>& b);
-	void UpdateProxies_Reference(b2GrowableBuffer<Proxy>& proxies) const;
-	void UpdateProxies_Simd(b2GrowableBuffer<Proxy>& proxies) const;
-	void UpdateProxies(b2GrowableBuffer<Proxy>& proxies) const;
-	void SortProxies(b2GrowableBuffer<Proxy>& proxies) const;
+		const ProxyKey* const a, const ProxyKey* const b, int count);
+	static bool AreProxyBuffersTheSame(const b2GrowableBuffer<ProxyKey>& a,
+	const b2GrowableBuffer<ProxyKey>& b);
 	void UpdateAndSortProxies();
 	void FilterContacts(b2GrowableBuffer<b2ParticleContact>& contacts);
 	void NotifyContactListenerPreContact(
@@ -1155,7 +1125,7 @@ private:
 	UserOverridableBuffer<int32> m_consecutiveContactStepsBuffer;
 	b2GrowableBuffer<int32> m_stuckParticleBuffer;
 	b2GrowableBuffer<Proxy> m_proxyBuffer;
-	b2ParticleProxySorter<Proxy> m_proxySorter;
+	b2ParticleProxySorter m_proxySorter;
 	int32 m_sortedProxyCount;
 	bool m_proxyHistoryValid;
 	mutable b2ParticleSystemProfile m_particleProfile;

@@ -664,10 +664,6 @@ int main(int argc, char** argv)
 	glui->add_checkbox("Time of Impact", &settings.enableContinuous);
 	glui->add_checkbox("Sub-Stepping", &settings.enableSubStepping);
 	glui->add_checkbox("Strict Particle/Body Contacts", &settings.strictContacts);
-	glui->add_checkbox("Adaptive Particle Sort", &settings.adaptiveParticleSort);
-	GLUI_Listbox* sorterList = glui->add_listbox("Variant", &settings.particleSortVariant);
-	sorterList->add_item(b2_twoStreamProxySort, "All movers to overflow");
-	sorterList->add_item(b2_pairMergeProxySort, "Separate movers + merge");
 
 	//glui->add_separator();
 

@@ -50,6 +50,7 @@ $(O)/Dynamics/b2ContactManager.cpp \
 $(O)/Particle/b2VoronoiDiagram.cpp \
 $(O)/Particle/b2ParticleGroup.cpp \
 $(O)/Particle/b2ParticleSystem.cpp \
+$(O)/Particle/b2ParticleProxySort.cpp \
 $(O)/Particle/b2Particle.cpp \
 $(O)/Common/b2FreeList.cpp \
 $(O)/Common/b2BlockAllocator.cpp \

@@ -106,6 +106,7 @@
 		71C98A2919067E1800D72E15 /* b2Particle.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 71C9885319067E1800D72E15 /* b2Particle.cpp */; };
 		71C98A2A19067E1800D72E15 /* b2ParticleGroup.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 71C9885519067E1800D72E15 /* b2ParticleGroup.cpp */; };
 		71C98A2B19067E1800D72E15 /* b2ParticleSystem.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 71C9885719067E1800D72E15 /* b2ParticleSystem.cpp */; };
+		D70DB9FC50EE462C8AC0A7E3 /* b2ParticleProxySort.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3A25D2DAC69349FCBE528B8F /* b2ParticleProxySort.cpp */; };
 		71C98A2C19067E1800D72E15 /* b2VoronoiDiagram.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 71C9885A19067E1800D72E15 /* b2VoronoiDiagram.cpp */; };
 		71C98A2E19067E1800D72E15 /* b2Rope.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 71C9886219067E1800D72E15 /* b2Rope.cpp */; };
 		71C98C3C190681B400D72E15 /* gl_emu.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 71C98C3A190681B400D72E15 /* gl_emu.cpp */; };
@@ -354,6 +355,7 @@
 		71C9885519067E1800D72E15 /* b2ParticleGroup.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = b2ParticleGroup.cpp; sourceTree = "<group>"; };
 		71C9885619067E1800D72E15 /* b2ParticleGroup.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = b2ParticleGroup.h; sourceTree = "<group>"; };
 		71C9885719067E1800D72E15 /* b2ParticleSystem.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = b2ParticleSystem.cpp; sourceTree = "<group>"; };
+		3A25D2DAC69349FCBE528B8F /* b2ParticleProxySort.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = b2ParticleProxySort.cpp; sourceTree = "<group>"; };
 		71C9885819067E1800D72E15 /* b2ParticleSystem.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = b2ParticleSystem.h; sourceTree = "<group>"; };
 		71C9885919067E1800D72E15 /* b2StackQueue.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = b2StackQueue.h; sourceTree = "<group>"; };
 		71C9885A19067E1800D72E15 /* b2VoronoiDiagram.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = b2VoronoiDiagram.cpp; sourceTree = "<group>"; };
@@ -856,6 +858,7 @@
 				71C9885519067E1800D72E15 /* b2ParticleGroup.cpp */,
 				71C9885619067E1800D72E15 /* b2ParticleGroup.h */,
 				71C9885719067E1800D72E15 /* b2ParticleSystem.cpp */,
+				3A25D2DAC69349FCBE528B8F /* b2ParticleProxySort.cpp */,
 				71C9885819067E1800D72E15 /* b2ParticleSystem.h */,
 				71C9885919067E1800D72E15 /* b2StackQueue.h */,
 				71C9885A19067E1800D72E15 /* b2VoronoiDiagram.cpp */,
@@ -1094,6 +1097,7 @@
 				7193F9A8193358E400D1DD47 /* fg_videoresize.c in Sources */,
 				7193F9A0193358E400D1DD47 /* fg_misc.c in Sources */,
 				71C98A2B19067E1800D72E15 /* b2ParticleSystem.cpp in Sources */,
+				D70DB9FC50EE462C8AC0A7E3 /* b2ParticleProxySort.cpp in Sources */,
 				71C98A1F19067E1800D72E15 /* b2RevoluteJoint.cpp in Sources */,
 				71C98A1C19067E1800D72E15 /* b2MouseJoint.cpp in Sources */,
 				7193F99C193358E400D1DD47 /* fg_input_devices.c in Sources */,

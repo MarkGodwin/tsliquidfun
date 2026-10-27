@@ -123,6 +123,7 @@ set(BOX2D_Joints_HDRS
 	Dynamics/Joints/b2WheelJoint.h
 )
 set(BOX2D_Particle_SRCS
+	Particle/b2ParticleProxySort.cpp
 	Particle/b2Particle.cpp
 	Particle/b2ParticleGroup.cpp
 	Particle/b2ParticleSystem.cpp

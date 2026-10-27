@@ -40,16 +40,10 @@
 #define LIQUIDFUN_SIMD_INLINE inline
 
 
-static const uint32 xTruncBits = 12;
-static const uint32 yTruncBits = 12;
-static const uint32 tagBits = 8u * sizeof(uint32);
-static const uint32 yOffset = 1u << (yTruncBits - 1u);
-static const uint32 yShift = tagBits - yTruncBits;
-static const uint32 xShift = tagBits - yTruncBits - xTruncBits;
-static const uint32 xScale = 1u << xShift;
-static const uint32 xOffset = xScale * (1u << (xTruncBits - 1u));
-static const uint32 yMask = ((1u << yTruncBits) - 1u) << yShift;
-static const uint32 xMask = ~yMask;
+static const uint32 yShift = b2ParticleProxy::rowShift;
+static const uint32 xShift = b2ParticleProxy::xShift;
+static const uint32 xMask = (1u << yShift) - 1;
+static const uint32 yMask = ~xMask;
 static const uint32 relativeTagRight = 1u << xShift;
 static const uint32 relativeTagBottomLeft = (uint32)((1 << yShift) +
                                                     ((~uint32(0)) << xShift));
@@ -344,7 +338,7 @@ public:
 
 static inline uint32 computeTag(float32 x, float32 y)
 {
-	return ((uint32)(y + yOffset) << yShift) + (uint32)(xScale * x + xOffset);
+	return b2ParticleProxy::ComputeTag(x, y);
 }
 
 static inline uint32 computeRelativeTag(uint32 tag, int32 x, int32 y)
@@ -708,6 +702,8 @@ int32 b2ParticleSystem::CreateParticle(const b2ParticleDef& def)
 		m_handleIndexBuffer.data[index] = NULL;
 	}
 	Proxy& proxy = m_proxyBuffer.Append();
+	proxy.tag = 0;
+	proxy.position = m_positionBuffer.data[index];
 
 	// If particle lifetimes are enabled or the lifetime is set in the particle
 	// definition, initialize the lifetime.
@@ -2060,11 +2056,12 @@ b2ParticleSystem::GetInsideBoundsEnumerator(const b2AABB& aabb) const
 	return InsideBoundsEnumerator(lowerTag, upperTag, firstProxy, lastProxy);
 }
 
-inline void b2ParticleSystem::AddContact(int32 a, int32 b,
+inline void b2ParticleSystem::AddContact(const Proxy& first, const Proxy& second,
 	b2GrowableBuffer<b2ParticleContact>& contacts) const
 {
+	int32 a = first.index, b = second.index;
+	b2Vec2 d = second.position - first.position;
 	B2_PARTICLE_STAT(++m_particleProfile.candidates);
-	b2Vec2 d = m_positionBuffer.data[b] - m_positionBuffer.data[a];
 	float32 distBtParticlesSq = b2Dot(d, d);
 	if (distBtParticlesSq < m_squaredDiameter)
 	{
@@ -2091,7 +2088,7 @@ void b2ParticleSystem::FindContacts_Reference(
 		for (const Proxy* b = a + 1; b < endProxy; b++)
 		{
 			if (rightTag < b->tag) break;
-			AddContact(a->index, b->index, contacts);
+			AddContact(*a, *b, contacts);
 		}
 		uint32 bottomLeftTag = computeRelativeTag(a->tag, -1, 1);
 		for (; c < endProxy; c++)
@@ -2102,7 +2099,7 @@ void b2ParticleSystem::FindContacts_Reference(
 		for (const Proxy* b = c; b < endProxy; b++)
 		{
 			if (bottomRightTag < b->tag) break;
-			AddContact(a->index, b->index, contacts);
+			AddContact(*a, *b, contacts);
 		}
 	}
 }
@@ -2118,7 +2115,7 @@ void b2ParticleSystem::ReorderForFindContact(FindContactInput* reordered,
 		const int proxyIndex = m_proxyBuffer[i].index;
 		FindContactInput& r = reordered[i];
 		r.proxyIndex = proxyIndex;
-		r.position = m_positionBuffer.data[proxyIndex];
+		r.position = m_proxyBuffer[i].position;
 	}
 
 	// We process multiple elements at a time, so we may read off the end of
@@ -2279,55 +2276,9 @@ inline b2ContactListener* b2ParticleSystem::GetParticleContactListener() const
 		m_world->m_contactManager.m_contactListener : NULL;
 }
 
-// Recalculate 'tag' in proxies using m_positionBuffer.
-// The 'tag' is an approximation of position, in left-right, top-bottom order.
-void b2ParticleSystem::UpdateProxies_Reference(
-	b2GrowableBuffer<Proxy>& proxies) const
-{
-	const Proxy* const endProxy = proxies.End();
-	for (Proxy* proxy = proxies.Begin(); proxy < endProxy; ++proxy)
-	{
-		int32 i = proxy->index;
-		b2Vec2 p = m_positionBuffer.data[i];
-		proxy->tag = computeTag(m_inverseDiameter * p.x,
-								m_inverseDiameter * p.y);
-	}
-}
-
-#if defined(LIQUIDFUN_SIMD_NEON)
-// static
-void b2ParticleSystem::UpdateProxyTags(
-	const uint32* const tags,
-	b2GrowableBuffer<Proxy>& proxies)
-{
-	const Proxy* const endProxy = proxies.End();
-	for (Proxy* proxy = proxies.Begin(); proxy < endProxy; ++proxy)
-	{
-		proxy->tag = tags[proxy->index];
-	}
-}
-
-void b2ParticleSystem::UpdateProxies_Simd(
-	b2GrowableBuffer<Proxy>& proxies) const
-{
-	uint32* tags = (uint32*)
-		m_world->m_stackAllocator.Allocate(m_count * sizeof(uint32));
-
-	// Calculate tag for every position.
-	// 'tags' array is in position-order.
-	CalculateTags_Simd(m_positionBuffer.data, m_count,
-					   m_inverseDiameter, tags);
-
-	// Update 'tag' element in the 'proxies' array to the new values.
-	UpdateProxyTags(tags, proxies);
-
-	m_world->m_stackAllocator.Free(tags);
-}
-#endif // defined(LIQUIDFUN_SIMD_NEON)
-
 // static
 bool b2ParticleSystem::ProxyBufferHasIndex(
-	int32 index, const Proxy* const a, int count)
+	int32 index, const ProxyKey* const a, int count)
 {
 	for (int j = 0; j < count; ++j)
 	{
@@ -2339,7 +2290,7 @@ bool b2ParticleSystem::ProxyBufferHasIndex(
 
 // static
 int b2ParticleSystem::NumProxiesWithSameTag(
-	const Proxy* const a, const Proxy* const b, int count)
+	const ProxyKey* const a, const ProxyKey* const b, int count)
 {
 	const uint32 tag = a[0].tag;
 	for (int num = 0; num < count; ++num)
@@ -2353,8 +2304,8 @@ int b2ParticleSystem::NumProxiesWithSameTag(
 // Precondition: both 'a' and 'b' should be sorted by tag, but don't need to be
 // sorted by index.
 // static
-bool b2ParticleSystem::AreProxyBuffersTheSame(const b2GrowableBuffer<Proxy>& a,
-								   			  const b2GrowableBuffer<Proxy>& b)
+bool b2ParticleSystem::AreProxyBuffersTheSame(const b2GrowableBuffer<ProxyKey>& a,
+	const b2GrowableBuffer<ProxyKey>& b)
 {
 	if (a.GetCount() != b.GetCount())
 		return false;
@@ -2381,50 +2332,6 @@ bool b2ParticleSystem::AreProxyBuffersTheSame(const b2GrowableBuffer<Proxy>& a,
 	return true;
 }
 
-LIQUIDFUN_SIMD_INLINE
-void b2ParticleSystem::UpdateProxies(
-	b2GrowableBuffer<Proxy>& proxies) const
-{
-	#if defined(LIQUIDFUN_SIMD_TEST_VS_REFERENCE)
-		b2GrowableBuffer<Proxy> reference(proxies);
-	#endif
-
-	#if defined(LIQUIDFUN_SIMD_NEON)
-		UpdateProxies_Simd(proxies);
-	#else
-		UpdateProxies_Reference(proxies);
-	#endif
-
-	#if defined(LIQUIDFUN_SIMD_TEST_VS_REFERENCE)
-		UpdateProxies_Reference(reference);
-		b2Assert(AreProxyBuffersTheSame(proxies, reference));
-	#endif
-}
-
-
-// Sort the proxy array by 'tag'. This orders the particles into rows that
-// run left-to-right, top-to-bottom. The rows are spaced m_particleDiameter
-// apart, such that a particle in one row can only collide with the rows
-// immediately above and below it. This ordering makes collision computation
-// tractable.
-//
-// TODO OPT: The sort is a hot spot on the profiles. We could use SIMD to
-// speed this up. See http://www.vldb.org/pvldb/1/1454171.pdf for an excellent
-// explanation of a SIMD mergesort algorithm.
-void b2ParticleSystem::SortProxies(b2GrowableBuffer<Proxy>& proxies) const
-{
-	std::sort(proxies.Begin(), proxies.End());
-}
-
-void b2ParticleSystem::SetProxySortMode(b2ParticleProxySortMode mode)
-{
-	b2Assert(!m_world->IsLocked());
-	if (m_world->IsLocked()) return;
-	b2Assert(mode >= b2_referenceProxySort && mode <= b2_twoStreamProxySort);
-	if (mode < b2_referenceProxySort || mode > b2_twoStreamProxySort) return;
-	m_def.proxySortMode = mode;
-}
-
 void b2ParticleSystem::UpdateAndSortProxies()
 {
 	B2_PARTICLE_PROXY_TIMER(proxyTimer, m_particleProfile.proxyMs);
@@ -2434,49 +2341,35 @@ void b2ParticleSystem::UpdateAndSortProxies()
 	{
 		m_sortedProxyCount = 0; m_proxyHistoryValid = true; return;
 	}
-	if (m_def.proxySortMode != b2_referenceProxySort)
-	{
-		Proxy* updated = m_proxySorter.Prepare(count, m_particleProfile, m_def.proxySortMode);
-		{
-			B2_PARTICLE_TIMER(tagTimer, m_particleProfile.tagMs);
-			for (int32 i = 0; i < count; ++i)
-			{
-				// Appended proxies do not have initialized old tags.
-				updated[i].index = m_proxyBuffer[i].index;
-				const b2Vec2& p = m_positionBuffer.data[updated[i].index];
-				updated[i].tag = computeTag(m_inverseDiameter * p.x, m_inverseDiameter * p.y);
-			}
-		}
 #if defined(BOX2D_VALIDATE_PARTICLE_PROXY_SORT)
-		b2GrowableBuffer<Proxy> reference(m_proxyBuffer);
-		memcpy(reference.Data(), updated, count * sizeof(Proxy));
-		SortProxies(reference);
-#endif
-		m_proxySorter.Sort(m_proxyBuffer.Data(), count, m_sortedProxyCount,
-			m_proxyHistoryValid, m_particleProfile, m_def.proxySortMode);
-#if defined(BOX2D_VALIDATE_PARTICLE_PROXY_SORT)
-		// Check both directions so duplicated output indices cannot conceal
-		// a missing index among proxies with the same tag.
-		if (!AreProxyBuffersTheSame(m_proxyBuffer, reference) ||
-			!AreProxyBuffersTheSame(reference, m_proxyBuffer))
-		{
-			b2Log("Adaptive proxy sort validation failed\n");
-			abort();
-		}
-#endif
-	}
-	else
+	// Independent shadow reference only; production builds have no key prefill.
+	b2GrowableBuffer<ProxyKey> reference(m_world->m_blockAllocator);
+	reference.Reserve(count); reference.SetCount(count);
+	for (int32 i = 0; i < count; ++i)
 	{
-		{
-			B2_PARTICLE_TIMER(tagTimer, m_particleProfile.tagMs);
-			UpdateProxies(m_proxyBuffer);
-		}
-		{
-			B2_PARTICLE_TIMER(orderTimer, m_particleProfile.orderMs);
-			B2_PARTICLE_TIMER(referenceTimer, m_particleProfile.referenceSortMs);
-			SortProxies(m_proxyBuffer);
-		}
+		reference[i].index = m_proxyBuffer[i].index;
+		const b2Vec2& p = m_positionBuffer.data[reference[i].index];
+		reference[i].tag = computeTag(m_inverseDiameter * p.x, m_inverseDiameter * p.y);
 	}
+	std::sort(reference.Begin(), reference.End());
+#endif
+	m_proxySorter.Sort(m_proxyBuffer.Data(), count, m_sortedProxyCount,
+		m_proxyHistoryValid, m_positionBuffer.data, m_inverseDiameter, m_particleProfile);
+#if defined(BOX2D_VALIDATE_PARTICLE_PROXY_SORT)
+	b2GrowableBuffer<ProxyKey> actual(m_world->m_blockAllocator);
+	actual.Reserve(count); actual.SetCount(count);
+	for (int32 i = 0; i < count; ++i)
+	{
+		actual[i].index = m_proxyBuffer[i].index;
+		actual[i].tag = m_proxyBuffer[i].tag;
+		const Proxy& proxy = m_proxyBuffer[i];
+		const b2Vec2& p = m_positionBuffer.data[proxy.index];
+		if (proxy.position.x != p.x || proxy.position.y != p.y)
+		{ b2Log("Cached proxy position validation failed\n"); abort(); }
+	}
+	if (!AreProxyBuffersTheSame(actual, reference) || !AreProxyBuffersTheSame(reference, actual))
+	{ b2Log("Cached proxy sort validation failed\n"); abort(); }
+#endif
 	m_sortedProxyCount = count;
 	m_proxyHistoryValid = true;
 }
@@ -2926,7 +2819,7 @@ private:
 		{
 			b2AABB aabb = fixture->GetAABB(childIndex);
 			b2ParticleSystem::InsideBoundsEnumerator enumerator =
-								m_system->GetInsideBoundsEnumerator(aabb);
+				m_system->GetInsideBoundsEnumerator(aabb);
 			int32 index;
 			while ((index = enumerator.GetNext()) >= 0)
 			{
@@ -4338,7 +4231,7 @@ void b2ParticleSystem::SolveZombie()
 	// update proxies
 	for (int32 k = 0; k < m_proxyBuffer.GetCount(); k++)
 	{
-		Proxy& proxy = m_proxyBuffer.Begin()[k];
+		Proxy& proxy = m_proxyBuffer[k];
 		proxy.index = newIndices[proxy.index];
 	}
 	int32 survivingSortedProxies = 0;
@@ -4619,7 +4512,7 @@ void b2ParticleSystem::RotateBuffer(int32 start, int32 mid, int32 end)
 	// update proxies
 	for (int32 k = 0; k < m_proxyBuffer.GetCount(); k++)
 	{
-		Proxy& proxy = m_proxyBuffer.Begin()[k];
+		Proxy& proxy = m_proxyBuffer[k];
 		proxy.index = newIndices[proxy.index];
 	}
 
@@ -4961,8 +4854,7 @@ void b2ParticleSystem::ApplyLinearImpulse(int32 firstIndex, int32 lastIndex,
 	}
 }
 
-void b2ParticleSystem::QueryAABB(b2QueryCallback* callback,
-								 const b2AABB& aabb) const
+void b2ParticleSystem::QueryAABB(b2QueryCallback* callback, const b2AABB& aabb) const
 {
 	if (m_proxyBuffer.GetCount() == 0)
 	{
@@ -5005,8 +4897,7 @@ void b2ParticleSystem::QueryShapeAABB(b2QueryCallback* callback,
 }
 
 void b2ParticleSystem::RayCast(b2RayCastCallback* callback,
-							   const b2Vec2& point1,
-							   const b2Vec2& point2) const
+	const b2Vec2& point1, const b2Vec2& point2) const
 {
 	if (m_proxyBuffer.GetCount() == 0)
 	{

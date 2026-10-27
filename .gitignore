@@ -5,6 +5,7 @@
 /liquidfun/Box2D/.vs
 /.vs
 /build-adaptive*/
+/build-contact-cache/
 /benchmark-results/
 /liquidfun/Box2D/Unittests/Release/
 /liquidfun/Box2D/Unittests/Debug/

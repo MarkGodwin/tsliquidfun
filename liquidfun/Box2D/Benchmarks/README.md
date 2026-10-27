@@ -1,129 +1,136 @@
-# Particle proxy sorting
+# Particle proxies and benchmarks
 
-The production default is `b2_twoStreamProxySort`. The reference `std::sort`
-remains selectable as `b2_referenceProxySort`. Two adaptive implementations are retained:
+The engine has one proxy layout: `Proxy` contains particle index, spatial tag
+and cached position (16 bytes). The concrete
+`b2ParticleProxySorter` uses `b2ParticleProxyKey` records with only index and tag
+(8 bytes). Classification computes each new tag from the current position and
+routes the key immediately into resident or overflow scratch. There is no
+pre-populated updated-key array and no second classification traversal of it.
+Overflow sorting moves only keys; final merge gathers current positions into
+the proxy array.
 
-| API mode | Benchmark name | Testbed variant |
-|---|---|---|
-| `b2_twoStreamProxySort` | `two-stream` | All movers to overflow |
-| `b2_pairMergeProxySort` | `pair` | Separate movers + merge |
+Positions refresh once per contact update, including unchanged tags and the
+remaining merge tail. `Solve()` updates contacts on every particle substep, so
+multiple particle iterations each get fresh positions. Newborn proxies are
+initialized at creation. Queries after integration use the authoritative
+position buffer for geometry, since the cached snapshot precedes integration.
 
-Select a mode through `b2ParticleSystemDef::proxySortMode` or call
-`SetProxySortMode()` outside world callbacks. The original adaptive sorter,
-insertion repair, lazy merge and direct four-way merge have been removed.
-Checkpoint `d4422fda` preserves all experiments; `RESULTS.md` records historical
-measurements and uses their original names. Existing generated result files
-are unchanged. Experimental enum values have been renumbered; rebuild clients.
+There is no non-cached engine path, spare proxy array, layout conversion,
+`proxySortMode`, `SetProxySortMode()` or Testbed sorter selector. Rebuild native
+clients after the layout/API change. Bounds enumeration is one concrete type
+with a fixed 16-byte stride and no layout branch or virtual dispatch.
 
-## Algorithms and memory
+Sort history preserves the ordered prefix while appending newborns. One
+adjacent swap repairs isolated inversions; larger inversions and Y-band movers
+enter overflow. Invalid history sends everything through overflow sorting.
+Radius changes invalidate history; deletion preserves the surviving prefix.
+Resident and overflow scratch capacity is 16 bytes per slot (two 8-byte key buffers), grows
+geometrically and is reused without allocation after warming up.
 
-Both algorithms retain previously sorted proxies and track an appended newborn
-tail. Each ordered stream accepts an item directly or repairs one adjacent
-inversion with a single swap. Larger inversions go into overflow, alongside
-newborns and particles that cannot use the ordered-stream route. Overflow is
-sorted with `std::sort`.
-
-- **Two-stream:** every Y-band mover goes to overflow. One two-way merge combines
-  residents with sorted overflow, bulk-copying the remaining tail.
-- **Separate movers:** movements of one band go into north/south streams.
-  Larger jumps go to overflow. The two shortest incoming streams are merged,
-  then the third, then residents. All merges use the same two-way helper.
-
-There is no counting pass, insertion-sort loop, shift budget or separate fallback
-path. Invalid history sends all particles through overflow sorting. A global
-order check keeps each stream sorted even if old history is unordered. Radius
-changes invalidate history; deletion preserves the surviving sorted-prefix
-length. Equal-tag order can differ from the reference and affect later trajectories.
-
-Scratch capacity is 16 bytes per slot for two-stream and 40 for separate movers.
-Buffers grow geometrically, remain allocated across mode changes and require no
-steady-state allocation once capacity is sufficient. Overflow reuses the consumed
-prefix of the updated-tag buffer, so its writes never overtake unread input.
-
-## Builds and correctness
-
-From the repository root, on Linux/Pi:
+## Build and test
 
 ```sh
-cmake -S liquidfun/Box2D -B build-adaptive-check \
+cmake -S liquidfun/Box2D -B build-contact-cache \
   -DCMAKE_BUILD_TYPE=Release -DBOX2D_BUILD_EXAMPLES=OFF \
-  -DBOX2D_BUILD_BENCHMARKS=ON -DBOX2D_PROFILE_PARTICLES=ON \
-  -DBOX2D_VALIDATE_PARTICLE_PROXY_SORT=ON
-cmake --build build-adaptive-check -j2
-cd liquidfun/Box2D/Unittests
-./ParticleProxySortTests
+  -DBOX2D_BUILD_UNITTESTS=ON -DBOX2D_BUILD_BENCHMARKS=ON \
+  -DBOX2D_PROFILE_PARTICLES=OFF -DBOX2D_PROFILE_PARTICLE_PROXY_ONLY=OFF \
+  -DBOX2D_VALIDATE_PARTICLE_PROXY_SORT=OFF
+cmake --build build-contact-cache --config Release
 ```
 
-Run all `*Tests` from `Unittests/` so baseline paths resolve. Visual Studio puts
-executables under `Unittests/Release/`; use `--config Release` and
-`-- /m:1 /nr:false` when building. The sorter suite tests both implementations,
-including randomized order/membership, newborns, jumps, disorder, contact
-equivalence, group lifecycle and mode-switch buffer reuse.
+Run test executables from `liquidfun/Box2D/Unittests/` so baseline paths resolve.
+Visual Studio puts them in `Unittests/Release/`; Unix builds put them directly
+in `Unittests/`. `ParticleProxySortTests` checks compact-key order/membership,
+in-place position emission, unchanged tags, every particle substep, contacts
+against an independent all-pairs reference, group lifecycle, current-position
+queries and barriers.
 
-`BOX2D_VALIDATE_PARTICLE_PROXY_SORT` shadow-checks exact proxy membership and
-ordering. Disable it for performance measurements. Existing test scenes use the
-production two-stream default; the old `BOX2D_TEST_ADAPTIVE_DEFAULT` option has
-been removed.
+`BOX2D_VALIDATE_PARTICLE_PROXY_SORT=ON` checks compact-key membership/order
+against `std::sort` and verifies emitted positions. Disable it when timing.
 
 ## Testbed and profiling
 
-Build Testbed with `BOX2D_BUILD_EXAMPLES=ON`. **Adaptive Particle Sort** toggles
-between reference and the selected **Variant** across every particle system.
-**Particle Timings** shows per-frame measurements; paused frames retain the last
-measured step, and changing modes clears that sample. Restart scenes for
-repeatable comparisons. Timings cover the world step, excluding rendering and
-scene emission/setup outside it.
+Build with `BOX2D_BUILD_EXAMPLES=ON` and launch Testbed. All scenes use cached
+positions automatically. **Particle Timings** shows physics-frame time and,
+when compiled in, stage timings across all systems/substeps. The fused tag/classification stage
+is `classifyMs` / `classify_ms`; `orderMs` now covers overflow sort and final merge.
+A separate tag-only timing is no longer available. Pausing retains
+the last measured sample. Rendering and scene setup/emission outside the world
+step are excluded from the physics-frame timer.
 
-Choose profiling at build time:
-
-- `BOX2D_PROFILE_PARTICLE_PROXY_ONLY=ON`: one timer around combined tag update
-  and sorting. Overrides detailed profiling; nested timers and counters compile
-  out. Prefer this for comparisons.
-- `BOX2D_PROFILE_PARTICLES=ON`, proxy-only OFF: stage timings, overflow counts,
-  swaps, contacts and scratch capacity. Timings are cumulative; reset using
-  `ResetParticleProfile()` and read `GetParticleProfile()`. Totals include their
-  components; remaining solver time is a residual.
-- Both OFF: no particle profiling; useful for final whole-step measurements.
+- `BOX2D_PROFILE_PARTICLE_PROXY_ONLY=ON`: only combined tag update/sort/position
+  emission time; overrides detailed profiling.
+- `BOX2D_PROFILE_PARTICLES=ON` with proxy-only OFF: detailed cumulative stage
+  timings and counters. Reset with `ResetParticleProfile()` and read with
+  `GetParticleProfile()`. Totals include their components.
+- Both OFF: no particle instrumentation; use this for whole-step timings.
 
 For example on Windows:
 
 ```powershell
-cmake -S liquidfun/Box2D -B build-adaptive-clean-testbed -DBOX2D_BUILD_EXAMPLES=ON -DBOX2D_BUILD_UNITTESTS=OFF -DBOX2D_PROFILE_PARTICLE_PROXY_ONLY=ON -DBOX2D_VALIDATE_PARTICLE_PROXY_SORT=OFF
-cmake --build build-adaptive-clean-testbed --config Release --target Testbed -- /m:1 /nr:false
-.\build-adaptive-clean-testbed\Testbed\Release\Testbed.exe
+cmake -S liquidfun/Box2D -B build-adaptive-cache-testbed -DBOX2D_BUILD_EXAMPLES=ON -DBOX2D_BUILD_UNITTESTS=OFF -DBOX2D_PROFILE_PARTICLES=ON -DBOX2D_PROFILE_PARTICLE_PROXY_ONLY=OFF -DBOX2D_VALIDATE_PARTICLE_PROXY_SORT=OFF
+cmake --build build-adaptive-cache-testbed --config Release --target Testbed -- /m:1 /nr:false
+.\build-adaptive-cache-testbed\Testbed\Release\Testbed.exe
 ```
 
-## Headless benchmarks
+## Headless world measurements
 
-Enable `BOX2D_BUILD_BENCHMARKS=ON` with examples OFF for a headless build.
-The executable supports `--sorter reference|pair|two-stream`, `--mode world|replay`,
-`--count`, `--iterations`, `--warmup`, `--steps`, `--seed`, and `--output`.
-Scenes are `settled`, `falling`, `shear`, `separated`, `churn`, and `teleport`.
+`ParticleSortBenchmark --mode world` always runs the cached engine. `--sorter`
+may be omitted or set to `cached`; other values are rejected in world mode.
+Scenes are `settled`, `falling`, `shear`, `separated`, `churn` and `teleport`.
+The executable accepts `--count`, `--iterations`, `--warmup`, `--steps`, `--seed`
+and `--output`. The output prefix's parent directory must exist.
 
 ```sh
 python3 liquidfun/Box2D/Benchmarks/run_matrix.py PATH_TO_BENCHMARK \
-  --baseline pair --candidate two-stream --output benchmark-results/current \
-  --counts 1000 3000 5000 --iterations 1 --runs 3 --steps 600 --warmup 300
+  --mode world --output benchmark-results/current \
+  --counts 1000 3000 5000 --iterations 1 2 --runs 3 --steps 600 --warmup 300
 ```
 
-The runner alternates baseline/candidate order and writes per-run step/summary
-CSVs, metadata, device state, `matrix.csv`, and `comparisons.csv`. Comparisons
-now use `baseline_*` and `candidate_*` columns. Positive improvement means lower
-candidate time. Unmeasured profile fields are zero. Copy the build's
-`Benchmarks/build-info-Release.txt` into results for compiler configuration.
+Matrix rows keep the requested count separately from the measured count, since
+replay snapshots can include pending zombies/newborns. World matrices contain
+one implementation, so they write `matrix.csv` and
+per-run step/summary CSVs, metadata and device state without an A/B comparisons
+file. Copy the build's `Benchmarks/build-info-Release.txt` into results.
+Unmeasured profile fields are zero. Use a fresh output directory per matrix.
 
-For identical sort inputs, add `--mode replay`, or save/load `--trace-out FILE`
-and `--trace-in FILE`. Replay captures reference-generated pre-step snapshots,
-which may include pending zombies and do not include later substeps. It excludes
-tag calculation, copying/setup, I/O and exact output verification from timing.
-Use world mode for combined update/order impact. Trace capture perturbs caches;
-do not use capture runs as final world-step timing evidence.
+## Sort-only replay comparisons
 
-Trace format: little-endian magic `LFPS0001`, uint32 frame count, then per frame
-uint32 count/prefix/valid and `(index, oldTag, newTag)` uint32 triples. Newborn
-old tags are unused. External traces report `external_trace`, maximum proxy
-count and zero for unknown capture seed/iterations; retain original metadata.
+The old `reference`, `pair` and `two-stream` algorithms remain selectable only
+for compact-key replay and historical comparisons. Their concrete implementation
+is in `Benchmarks/ParticleProxyReplaySort.h`, outside the engine sorter. Replay
+continues to accept precomputed tags, so it does not measure fused production
+classification. Sorter tests compare the production pass with the historical
+two-stream result using positions that round-trip exact tags. Replay
+excludes tag calculation, final position emission, setup/copying, I/O and exact
+output verification from its timing. It cannot measure cached contact access.
 
-The Pi Zero W requires ARMv6/VFP-compatible compilation, not NEON. Final
-acceptance needs target-device measurements with stable CPU frequency and no
-throttling. Desktop results alone do not establish a 60-fps particle limit.
+```sh
+python3 liquidfun/Box2D/Benchmarks/run_matrix.py PATH_TO_BENCHMARK \
+  --mode replay --baseline pair --candidate two-stream \
+  --output benchmark-results/replay --counts 1000 3000 5000 \
+  --iterations 1 --runs 3 --steps 600 --warmup 300
+```
+
+Replay alternates baseline/candidate order and also writes `comparisons.csv`.
+Positive improvement means lower candidate time. `--sorter cached` is rejected
+in replay because the trace contains no positions.
+
+Capture/load traces with `--trace-out FILE` and `--trace-in FILE`. Captured
+snapshots now come from the cached engine before a step, may include pending
+zombies and do not include later substeps. Capture perturbs caches; omit it for
+final world timings. The unchanged trace format is little-endian `LFPS0001`,
+uint32 frame count, then per-frame uint32 count/prefix/valid and
+`(index, oldTag, newTag)` uint32 triples. Newborn old tags are unused. External
+traces report `external_trace`, maximum proxy count and zero for unknown
+seed/iterations; retain their original metadata.
+
+## Historical measurements
+
+[Initial contact-cache experiment](CONTACT_CACHE.md) and
+[engine measurements](CONTACT_CACHE_ENGINE.md) record why this layout was
+selected. Their compact-versus-cached modes are no longer present in the engine.
+Older sorting experiments are recorded in `RESULTS.md` and checkpoint `d4422fda`.
+
+The Pi Zero W requires ARMv6/VFP-compatible compilation rather than NEON.
+Desktop timing results do not establish target-device gains or particle limits.
