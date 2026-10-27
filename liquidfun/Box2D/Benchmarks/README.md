@@ -140,3 +140,6 @@ Older sorting experiments are recorded in `RESULTS.md` and checkpoint `d4422fda`
 
 The Pi Zero W requires ARMv6/VFP-compatible compilation rather than NEON.
 Desktop timing results do not establish target-device gains or particle limits.
+
+[Discarded particle-buffer spatial reordering experiment](SPATIAL_REORDER.md)
+records the implementation, correctness findings and measured regressions.
